@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { Badge } from "@/components/ui/badge"
 import { Textarea } from "@/components/ui/textarea"
-import { 
+import {
   Sparkles, 
   Plus, 
   Folder, 
@@ -55,6 +55,7 @@ export default function Dashboard() {
   const [bRollScript, setBRollScript] = useState('')
   const [generationPhase, setGenerationPhase] = useState('')
   const [generationProgress, setGenerationProgress] = useState(0)
+  const [visitedSteps, setVisitedSteps] = useState<Set<GenerationStep>>(new Set(['input']))
 
   // Define phases for generation process
   const phases = [
@@ -96,6 +97,7 @@ export default function Dashboard() {
     
     setIsGenerating(true)
     setCurrentStep('analysis')
+    setVisitedSteps(prev => new Set([...prev, 'analysis']))
     
     // Simulate API call for market analysis
     setTimeout(() => {
@@ -154,6 +156,7 @@ SCENE 3: Mount Fuji region
         // Generation complete
         setTimeout(() => {
           setCurrentStep('video')
+          setVisitedSteps(prev => new Set([...prev, 'video']))
           setIsGenerating(false)
           setGenerationPhase('')
           setGenerationProgress(0)
@@ -178,6 +181,7 @@ SCENE 3: Mount Fuji region
 
   const handleStepChange = (stepId: string) => {
     setCurrentStep(stepId as GenerationStep)
+    setVisitedSteps(prev => new Set([...prev, stepId as GenerationStep]))
   }
 
   const steps = [
@@ -197,12 +201,8 @@ SCENE 3: Mount Fuji region
   }
 
   const canNavigateToStep = (stepId: string) => {
-    const stepOrder = ['analysis', 'storyboard', 'video']
-    const currentIndex = stepOrder.indexOf(currentStep)
-    const stepIndex = stepOrder.indexOf(stepId)
-    
-    // Only allow navigation to past steps or current step
-    return stepIndex <= currentIndex && contentInput.trim().length > 0
+    // Allow navigation to any visited step if content input exists
+    return visitedSteps.has(stepId as GenerationStep) && contentInput.trim().length > 0
   }
 
   return (
@@ -357,9 +357,9 @@ SCENE 3: Mount Fuji region
                     </div>
                   )
                 })}
-              </div>
-            </div>
-          </div>
+                  </div>
+                  </div>
+                </div>
         )}
 
         <div className="p-4 lg:p-8">
@@ -374,11 +374,11 @@ SCENE 3: Mount Fuji region
                       <div className="relative mb-6">
                         <div className="w-16 h-16 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-2xl flex items-center justify-center mx-auto shadow-xl">
                           <Video className="w-8 h-8 text-white" />
-                        </div>
+                  </div>
                         <div className="absolute -top-1 -right-1 w-6 h-6 bg-green-500 rounded-full flex items-center justify-center animate-pulse">
                           <div className="w-2 h-2 bg-white rounded-full"></div>
-                        </div>
-                      </div>
+                  </div>
+                </div>
                       
                       <h3 className="text-2xl font-bold text-slate-900 mb-2">Creating Your Video</h3>
                       <p className="text-slate-600 mb-6">Please wait while we process your content...</p>
@@ -388,14 +388,14 @@ SCENE 3: Mount Fuji region
                         <div className="flex justify-between text-sm font-medium text-slate-700">
                           <span>Progress</span>
                           <span>{Math.round(generationProgress)}%</span>
-                        </div>
+                  </div>
                         <div className="w-full bg-slate-200 rounded-full h-3 overflow-hidden">
                           <div 
                             className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full transition-all duration-1000 ease-out" 
                             style={{ width: `${generationProgress}%` }}
                           ></div>
-                        </div>
-                      </div>
+                  </div>
+                </div>
                       
                       {/* Vertical Carousel of Generation Steps */}
                       <div className="space-y-3 max-h-60 overflow-y-auto">
@@ -442,7 +442,7 @@ SCENE 3: Mount Fuji region
                           )
                         })}
                       </div>
-                    </div>
+                  </div>
                   </div>
                 </div>
               )}
@@ -450,101 +450,114 @@ SCENE 3: Mount Fuji region
               {/* Initial Input State */}
               {currentStep === 'input' && (
                 <>
-                  {/* Hero Section with Gradient Background */}
-                  <div className="relative mb-12 overflow-hidden">
-                    <div className="absolute inset-0 bg-gradient-to-r from-indigo-500/5 via-purple-500/5 to-pink-500/5 rounded-3xl"></div>
-                    <div className="absolute inset-0 bg-gradient-to-br from-white/80 to-white/40 rounded-3xl"></div>
-                    <div className="relative p-8 lg:p-12 text-center">
-                      <div className="inline-flex items-center px-4 py-2 bg-indigo-100 text-indigo-700 rounded-full text-sm font-medium mb-6">
-                        <Sparkles className="w-4 h-4 mr-2" />
-                        AI-Powered Content Creation
+                  {/* Enhanced Hero Section with Visual Elements */}
+                  <div className="relative text-center mb-16 max-w-4xl mx-auto">
+                    {/* Subtle background decorations */}
+                    <div className="absolute inset-0 -z-10 overflow-hidden">
+                      <div className="absolute top-10 left-10 w-32 h-32 bg-indigo-100 rounded-full blur-3xl opacity-30"></div>
+                      <div className="absolute top-20 right-16 w-24 h-24 bg-purple-100 rounded-full blur-2xl opacity-40"></div>
+                      <div className="absolute bottom-10 left-1/3 w-28 h-28 bg-pink-100 rounded-full blur-3xl opacity-25"></div>
+                    </div>
+                    
+                    <div className="flex items-center justify-center mb-8 animate-fade-in">
+                      <div className="w-10 h-10 bg-gradient-to-br from-indigo-600 to-purple-600 rounded-xl flex items-center justify-center mr-3 shadow-lg">
+                        <Sparkles className="w-6 h-6 text-white" />
                       </div>
-                      <h1 className="text-3xl lg:text-5xl font-extrabold text-slate-900 mb-4 leading-tight">
-                        Generate viral content in{" "}
-                        <span className="relative">
-                          <span className="bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
-                            seconds
-                          </span>
-                          <div className="absolute -bottom-2 left-0 right-0 h-1 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-full opacity-30"></div>
+                      <span className="text-3xl font-bold bg-gradient-to-r from-slate-900 to-slate-700 bg-clip-text text-transparent">supernova</span>
+                    </div>
+                    
+                    <h1 className="text-5xl lg:text-7xl font-bold text-slate-900 mb-8 leading-tight">
+                      Generate{" "}
+                      <span className="relative inline-block">
+                        <span className="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
+                          viral content
                         </span>
-                      </h1>
-                      <p className="text-xl text-slate-600 max-w-2xl mx-auto mb-8">
-                        Transform any idea into engaging video content using your AI digital twin. 
-                        From articles to trending topics - we've got you covered.
-                      </p>
+                        <div className="absolute -bottom-2 left-0 right-0 h-1 bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 rounded-full opacity-60"></div>
+                      </span>
+                      {" "}in seconds
+                    </h1>
+                    
+                    <p className="text-xl lg:text-2xl text-slate-600 mb-12 max-w-3xl mx-auto leading-relaxed font-light">
+                      Transform any idea into engaging video content using your AI digital twin. 
+                      From articles to trending topics - we've got you covered.
+                    </p>
+                  </div>
+
+                  {/* Enhanced Input Section with Glass Morphism */}
+                  <div className="max-w-3xl mx-auto mb-20 relative">
+                    {/* Glowing background effect */}
+                    <div className="absolute inset-0 bg-gradient-to-r from-indigo-500/10 via-purple-500/10 to-pink-500/10 rounded-3xl blur-xl"></div>
+                    
+                    <div className="relative bg-white/80 backdrop-blur-sm border border-white/20 rounded-3xl p-8 shadow-2xl">
+                      <div className="relative">
+                        <Input
+                          value={contentInput}
+                          onChange={(e) => setContentInput(e.target.value)}
+                          placeholder="describe your short video content idea.."
+                          className="h-14 px-8 pr-32 text-lg border-2 border-slate-200/50 focus:border-indigo-400 focus:ring-0 focus:outline-none rounded-2xl bg-white/90 backdrop-blur-sm shadow-lg placeholder:text-slate-400"
+                          disabled={isGenerating}
+                        />
+                        <Button 
+                          onClick={handleGenerate}
+                          disabled={!contentInput.trim() || isGenerating}
+                          className="absolute right-3 top-3 h-8 px-6 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
+                        >
+                          {isGenerating ? (
+                            <div className="flex items-center space-x-2">
+                              <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                              <span>Analyzing...</span>
+                            </div>
+                          ) : (
+                            <>
+                              <Send className="w-5 h-5 mr-2" />
+                              Generate
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                      
+                      {/* Floating action indicators */}
+                      <div className="flex items-center justify-center mt-6 space-x-6">
+                        <div className="flex items-center space-x-2 text-slate-500">
+                          <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                          <span className="text-sm font-medium">AI Ready</span>
+                        </div>
+                        <div className="flex items-center space-x-2 text-slate-500">
+                          <Video className="w-4 h-4 text-indigo-500" />
+                          <span className="text-sm font-medium">Video Generation</span>
+                        </div>
+                        <div className="flex items-center space-x-2 text-slate-500">
+                          <Sparkles className="w-4 h-4 text-purple-500" />
+                          <span className="text-sm font-medium">Digital Twin</span>
+                        </div>
+                      </div>
                     </div>
                   </div>
 
-                  {/* Main Input Section */}
-                  <div className="mb-10">
-                    <Card className="shadow-xl border-0 bg-white/90 backdrop-blur-sm overflow-hidden">
-                      <div className="absolute inset-0 bg-gradient-to-r from-indigo-500/5 to-purple-500/5"></div>
-                      <CardContent className="relative p-6 lg:p-8">
-                        <div className="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4">
-                          <div className="flex-1 relative">
-                            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                              <Search className="h-5 w-5 text-slate-400" />
-                            </div>
-                            <Input
-                              value={contentInput}
-                              onChange={(e) => setContentInput(e.target.value)}
-                              placeholder="Enter your content idea, paste a YouTube link, or describe what you want to create..."
-                              className="h-14 pl-12 text-lg border-2 border-slate-200 focus:border-indigo-400 focus:ring-indigo-400/20 bg-white/80 backdrop-blur-sm"
-                              disabled={isGenerating}
-                            />
-                          </div>
-                          <Button 
-                            onClick={handleGenerate}
-                            disabled={!contentInput.trim() || isGenerating}
-                            className="h-14 px-8 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-semibold w-full sm:w-auto shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
-                          >
-                            {isGenerating ? (
-                              <div className="flex items-center space-x-2">
-                                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                                <span>Analyzing...</span>
-                              </div>
-                            ) : (
-                              <>
-                                <Send className="w-5 h-5 mr-2" />
-                                Generate Content
-                              </>
-                            )}
-                          </Button>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </div>
-
-                  {/* Example Prompts Section */}
-                  <div className="mb-10">
-                    <h3 className="text-lg font-semibold text-slate-900 mb-4 flex items-center">
-                      <div className="w-2 h-2 bg-purple-600 rounded-full mr-3"></div>
-                      Popular Prompts to Get You Started
-                    </h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {[
-                        "Top 5 travel destinations in Japan",
-                        "10 AI tools that will change your workflow",
-                        "How to build a SaaS product in 30 days",
-                        "The future of remote work in 2024",
-                        "Productivity hacks for entrepreneurs",
-                        "Explaining blockchain in simple terms"
-                      ].map((prompt, index) => (
-                        <button
-                          key={index}
-                          onClick={() => setContentInput(prompt)}
-                          className="p-4 text-left bg-gradient-to-r from-slate-50 to-slate-100 hover:from-indigo-50 hover:to-purple-50 rounded-xl border border-slate-200 hover:border-indigo-300 transition-all duration-300 hover:shadow-md group"
-                        >
-                          <div className="flex items-start space-x-3">
-                            <div className="w-8 h-8 bg-gradient-to-br from-indigo-100 to-purple-100 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
-                              <Sparkles className="w-4 h-4 text-indigo-600" />
-                            </div>
-                            <p className="text-sm font-medium text-slate-700 group-hover:text-indigo-700 transition-colors leading-relaxed">
-                              {prompt}
-                            </p>
-                          </div>
-                        </button>
-                      ))}
+                  {/* Feature highlights with animations */}
+                  <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+                    <div className="text-center p-6 rounded-2xl bg-gradient-to-br from-indigo-50 to-purple-50 border border-indigo-100 hover:shadow-lg transition-all duration-300 hover:-translate-y-1">
+                      <div className="w-16 h-16 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
+                        <User className="w-8 h-8 text-white" />
+                      </div>
+                      <h3 className="text-xl font-bold text-slate-900 mb-2">AI Digital Twin</h3>
+                      <p className="text-slate-600 leading-relaxed">Create your personalized AI avatar that speaks and moves like you</p>
+                    </div>
+                    
+                    <div className="text-center p-6 rounded-2xl bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-100 hover:shadow-lg transition-all duration-300 hover:-translate-y-1">
+                      <div className="w-16 h-16 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
+                        <TrendingUp className="w-8 h-8 text-white" />
+                      </div>
+                      <h3 className="text-xl font-bold text-slate-900 mb-2">Viral Content</h3>
+                      <p className="text-slate-600 leading-relaxed">AI-powered content optimization for maximum engagement and reach</p>
+                    </div>
+                    
+                    <div className="text-center p-6 rounded-2xl bg-gradient-to-br from-pink-50 to-rose-50 border border-pink-100 hover:shadow-lg transition-all duration-300 hover:-translate-y-1">
+                      <div className="w-16 h-16 bg-gradient-to-br from-pink-500 to-rose-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
+                        <Video className="w-8 h-8 text-white" />
+                      </div>
+                      <h3 className="text-xl font-bold text-slate-900 mb-2">Instant Videos</h3>
+                      <p className="text-slate-600 leading-relaxed">Generate professional videos in seconds with automatic B-roll and voiceover</p>
                     </div>
                   </div>
                 </>
@@ -641,14 +654,14 @@ SCENE 3: Mount Fuji region
                       </CardContent>
                     </Card>
 
-                    <Card>
-                      <CardHeader>
+            <Card>
+              <CardHeader>
                         <CardTitle className="flex items-center">
                           <Users className="w-5 h-5 mr-2 text-orange-600" />
                           Competitive Landscape
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
                         <div className="space-y-3">
                           {[
                             { channel: "Japan Travel Guide", subs: "2.3M", engagement: "4.2%" },
@@ -656,14 +669,14 @@ SCENE 3: Mount Fuji region
                             { channel: "Wandering Japan", subs: "956K", engagement: "5.1%" }
                           ].map((competitor, index) => (
                             <div key={index} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
-                              <div>
+                  <div>
                                 <p className="font-medium text-slate-900">{competitor.channel}</p>
                                 <p className="text-sm text-slate-600">{competitor.subs} subscribers</p>
-                              </div>
+                    </div>
                               <Badge variant="outline">{competitor.engagement} engagement</Badge>
-                            </div>
+                  </div>
                           ))}
-                        </div>
+                    </div>
                       </CardContent>
                     </Card>
                   </div>
@@ -682,14 +695,14 @@ SCENE 3: Mount Fuji region
                   <div className="flex justify-between items-center pt-4">
                     <Button
                       variant="outline"
-                      onClick={() => setCurrentStep('input')}
+                      onClick={() => handleStepChange('input')}
                       className="flex items-center"
                     >
                       <User className="w-4 h-4 mr-2" />
                       Back to Input
                     </Button>
                     <Button
-                      onClick={() => setCurrentStep('storyboard')}
+                      onClick={() => handleStepChange('storyboard')}
                       className="bg-indigo-600 hover:bg-indigo-700 flex items-center"
                     >
                       Continue to Storyboard
@@ -729,12 +742,12 @@ SCENE 3: Mount Fuji region
                           className="min-h-[400px] text-sm leading-relaxed"
                           placeholder="Your spoken content will appear here..."
                         />
-                      </CardContent>
-                    </Card>
+              </CardContent>
+            </Card>
 
                     {/* B-Roll Script */}
-                    <Card>
-                      <CardHeader>
+            <Card>
+              <CardHeader>
                         <CardTitle className="flex items-center justify-between">
                           <div className="flex items-center">
                             <Video className="w-5 h-5 mr-2 text-emerald-600" />
@@ -745,8 +758,8 @@ SCENE 3: Mount Fuji region
                             Regenerate
                           </Button>
                         </CardTitle>
-                      </CardHeader>
-                      <CardContent>
+              </CardHeader>
+              <CardContent>
                         <Textarea
                           value={bRollScript}
                           onChange={(e) => setBRollScript(e.target.value)}
@@ -765,10 +778,10 @@ SCENE 3: Mount Fuji region
                       className="px-8 py-4 text-lg bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
                     >
                       {isGenerating ? (
-                        <div className="flex items-center space-x-2">
+                    <div className="flex items-center space-x-2">
                           <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
                           <span>Starting Generation...</span>
-                        </div>
+                    </div>
                       ) : (
                         <>
                           <Video className="w-5 h-5 mr-2" />
@@ -782,7 +795,7 @@ SCENE 3: Mount Fuji region
                   <div className="flex justify-between items-center pt-4">
                     <Button
                       variant="outline"
-                      onClick={() => setCurrentStep('analysis')}
+                      onClick={() => handleStepChange('analysis')}
                       disabled={isGenerating}
                       className="flex items-center"
                     >
@@ -790,7 +803,7 @@ SCENE 3: Mount Fuji region
                       Back to Analysis
                     </Button>
                   </div>
-                </div>
+                    </div>
               )}
 
               {/* Final Video Step */}
@@ -814,10 +827,10 @@ SCENE 3: Mount Fuji region
                           <Button className="w-16 h-16 rounded-full bg-white/20 backdrop-blur-sm hover:bg-white/30 border-2 border-white/50">
                             <Play className="w-6 h-6 text-white ml-1" />
                           </Button>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
 
                   {/* Video Metadata */}
                   <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -842,7 +855,7 @@ SCENE 3: Mount Fuji region
                         <p className="text-lg font-semibold text-slate-900">Alex (AI)</p>
                       </CardContent>
                     </Card>
-                    <Card>
+            <Card>
                       <CardContent className="p-4 text-center">
                         <Eye className="w-8 h-8 mx-auto mb-2 text-orange-600" />
                         <p className="text-sm text-slate-600">Format</p>
@@ -879,7 +892,7 @@ SCENE 3: Mount Fuji region
                   <div className="flex justify-between items-center pt-4">
                     <Button
                       variant="outline"
-                      onClick={() => setCurrentStep('storyboard')}
+                      onClick={() => handleStepChange('storyboard')}
                       className="flex items-center"
                     >
                       <Edit className="w-4 h-4 mr-2" />
@@ -887,10 +900,11 @@ SCENE 3: Mount Fuji region
                     </Button>
                     <Button
                       onClick={() => {
-                        setCurrentStep('input')
+                        handleStepChange('input')
                         setContentInput('')
                         setARollScript('')
                         setBRollScript('')
+                        setVisitedSteps(new Set(['input']))
                       }}
                       className="bg-emerald-600 hover:bg-emerald-700 flex items-center"
                     >
@@ -1071,9 +1085,9 @@ SCENE 3: Mount Fuji region
                     >
                       Process Avatar Video
                     </Button>
-                  </CardContent>
-                </Card>
-              </div>
+              </CardContent>
+            </Card>
+          </div>
             </div>
           )}
         </div>
