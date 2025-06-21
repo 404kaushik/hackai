@@ -38,7 +38,8 @@ import {
   Globe,
   Heart,
   MessageCircle,
-  Share
+  Share,
+  ArrowLeft
 } from 'lucide-react'
 
 type Tab = 'create' | 'library' | 'settings'
@@ -57,6 +58,14 @@ export default function Dashboard() {
   const [generationProgress, setGenerationProgress] = useState(0)
   const [visitedSteps, setVisitedSteps] = useState<Set<GenerationStep>>(new Set(['input']))
   const [showToast, setShowToast] = useState(false)
+  const [contentLibrary, setContentLibrary] = useState<Array<{
+    id: number;
+    title: string;
+    thumbnail: string;
+    createdAt: string;
+    type: string;
+    script: string;
+  }>>([])
 
   // Handle video events
   useEffect(() => {
@@ -133,31 +142,6 @@ export default function Dashboard() {
     { name: 'Creating B-Roll Visuals...', duration: 3500 },
     { name: 'Rendering Video...', duration: 2000 },
     { name: 'Finalizing Output...', duration: 1000 }
-  ]
-
-  // Mock data for library
-  const mockContent = [
-    {
-      id: 1,
-      title: "10 AI Tools That Will Change Your Life",
-      thumbnail: "/api/placeholder/200/120",
-      createdAt: "2024-06-20",
-      type: "Article-to-Video"
-    },
-    {
-      id: 2,
-      title: "How to Build a SaaS in 30 Days",
-      thumbnail: "/api/placeholder/200/120", 
-      createdAt: "2024-06-19",
-      type: "YouTube Analysis"
-    },
-    {
-      id: 3,
-      title: "Brand Partnership Strategy Guide",
-      thumbnail: "/api/placeholder/200/120",
-      createdAt: "2024-06-18", 
-      type: "Custom Content"
-    }
   ]
 
   const handleGenerate = async () => {
@@ -276,7 +260,57 @@ export default function Dashboard() {
     return visitedSteps.has(stepId as GenerationStep) && contentInput.trim().length > 0
   }
 
-  const handleAddToLibrary = () => {
+  const generateVideoThumbnail = (videoSrc: string): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const video = document.createElement('video')
+      const canvas = document.createElement('canvas')
+      const ctx = canvas.getContext('2d')
+      
+      video.crossOrigin = 'anonymous'
+      video.src = videoSrc
+      
+      video.onloadedmetadata = () => {
+        // Set canvas dimensions to match video
+        canvas.width = video.videoWidth
+        canvas.height = video.videoHeight
+        
+        // Seek to 1 second into the video for thumbnail
+        video.currentTime = 1
+      }
+      
+      video.onseeked = () => {
+        if (ctx) {
+          // Draw video frame to canvas
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
+          
+          // Convert canvas to data URL
+          const thumbnailDataUrl = canvas.toDataURL('image/jpeg', 0.8)
+          resolve(thumbnailDataUrl)
+        } else {
+          reject(new Error('Could not get canvas context'))
+        }
+      }
+      
+      video.onerror = () => {
+        reject(new Error('Video failed to load'))
+      }
+    })
+  }
+
+  const handleAddToLibrary = async () => {
+    // Create new content item
+    const newContent = {
+      id: Date.now(), // Simple ID generation
+      title: contentInput.trim() || "Untitled Content",
+      thumbnail: "/api/placeholder/300/180", // Placeholder thumbnail
+      createdAt: new Date().toISOString().split('T')[0], // Today's date
+      type: "AI Generated Video",
+      script: aRollScript
+    }
+    
+    // Add to library
+    setContentLibrary(prev => [newContent, ...prev])
+    
     setShowToast(true)
     // Hide toast and redirect after 2 seconds
     setTimeout(() => {
@@ -890,13 +924,13 @@ export default function Dashboard() {
                     <h1 className="text-3xl font-bold text-slate-900 mb-2">Generated Script & Visual Plan</h1>
                     <p className="text-slate-600">Review and customize your content before generating the final video</p>
                     
-                    {/* Back Button - Top Right */}
+                    {/* Back Button - Top Left */}
                     <Button
                       variant="outline"
                       onClick={() => handleStepChange('analysis')}
-                      className="absolute top-0 right-0 flex items-center"
+                      className="absolute top-0 left-0 flex items-center"
                     >
-                      <User className="w-4 h-4 mr-2" />
+                      <ArrowLeft className="w-4 h-4 mr-2" />
                       Back
                     </Button>
                   </div>
@@ -981,13 +1015,13 @@ export default function Dashboard() {
                     <h1 className="text-3xl font-bold text-slate-900 mb-2">Your AI-Generated Video</h1>
                     <p className="text-slate-600">Your content is ready to share with the world!</p>
                     
-                    {/* Back Button - Top Right */}
+                    {/* Back Button - Top Left */}
                     <Button
                       variant="outline"
                       onClick={() => handleStepChange('storyboard')}
-                      className="absolute top-0 right-0 flex items-center"
+                      className="absolute top-0 left-0 flex items-center"
                     >
-                      <Edit className="w-4 h-4 mr-2" />
+                      <ArrowLeft className="w-4 h-4 mr-2" />
                       Back
                     </Button>
                   </div>
@@ -1203,13 +1237,13 @@ export default function Dashboard() {
                 <p className="text-slate-600">Manage and view your created content.</p>
               </div>
 
-              {mockContent.length > 0 ? (
+              {contentLibrary.length > 0 ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {mockContent.map((content) => (
+                  {contentLibrary.map((content) => (
                     <Card key={content.id} className="shadow-md hover:shadow-lg transition-all duration-300 hover:-translate-y-1">
                       <div className="aspect-video bg-slate-200 rounded-t-lg overflow-hidden">
                         <img 
-                          src="/api/placeholder/300/180" 
+                          src={content.thumbnail} 
                           alt={content.title}
                           className="w-full h-full object-cover"
                         />
