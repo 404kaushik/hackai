@@ -73,10 +73,20 @@ export default function LandingPage() {
             </span>
           </div>
           
-          <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold mb-6 leading-tight">
-            Create Content at
+          <h1 className="text-4xl md:text-6xl lg:text-9xl font-bold mb-6 leading-tight opacity-0 transform translate-y-8 transition-all duration-1000 data-[animate=true]:opacity-100 data-[animate=true]:translate-y-0" data-animate>
+            <span className="inline-block hover:scale-105 transition-transform duration-300">
+              Create Content at
+            </span>
             <br />
-            <span className="text-gray-400">Superhuman</span> Speed
+            <span className="relative inline-block">
+              <span className="absolute -inset-1 bg-gradient-to-r from-purple-600 to-blue-600 blur opacity-30 group-hover:opacity-100 transition duration-1000"></span>
+              <span className="relative inline-block text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-blue-600 hover:scale-105 transition-all duration-300">
+                Superhuman
+              </span>
+            </span>
+            <span className="inline-block hover:scale-105 transition-transform duration-300">
+              Speed
+            </span>
           </h1>
           
           <p className="text-lg md:text-xl text-gray-600 max-w-4xl mx-auto mb-8 leading-relaxed">
@@ -86,8 +96,12 @@ export default function LandingPage() {
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
             <button
-              onClick={() => handleClick('Start Creating')}
-              className="px-8 py-3 bg-black hover:bg-gray-800 text-white rounded-full text-lg font-medium transition-all duration-300 hover:scale-105 flex items-center"
+              onClick={async () => {
+                const btn = document.activeElement as HTMLButtonElement;
+                btn.disabled = true;
+                window.location.href = '/dashboard';
+              }}
+              className="px-8 py-3 bg-black hover:bg-gray-800 text-white rounded-full text-lg font-medium transition-all duration-300 hover:scale-105 flex items-center disabled:opacity-75 disabled:hover:bg-black disabled:hover:scale-100"
             >
               Start Creating <ArrowRight className="ml-2 w-5 h-5" />
             </button>
