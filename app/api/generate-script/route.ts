@@ -110,12 +110,14 @@ IMPORTANT: Always respond with valid JSON in this exact format:
 }
 
 A-roll script should be:
-- Direct, engaging spoken content
+- Direct, engaging spoken content ONLY
 - Hook within first 3 seconds  
 - Clear value proposition
 - Natural, conversational tone
 - 20-30 seconds when spoken
 - Include natural pauses and emphasis
+- NO presenter labels, timestamps, or asterisk formatting
+- Write as if speaking directly to the audience
 
 B-roll script should be:
 - Specific visual directions
@@ -123,7 +125,9 @@ B-roll script should be:
 - Text overlays and graphics
 - Timing cues
 - Visual hooks and attention-grabbers
-- Platform optimization notes`
+- Platform optimization notes
+
+CRITICAL: The A-roll script must contain ONLY the spoken words without any labels, timestamps, or formatting. The voice agent will speak this content directly.`
 
       let userPrompt = `Create A-roll and B-roll scripts for: "${idea}"`
 

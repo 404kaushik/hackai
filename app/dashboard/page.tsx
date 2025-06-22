@@ -88,6 +88,18 @@ const heygenAPI = {
     // Remove timestamp patterns like [0:00-0:05], [0:05-0:10], etc.
     let cleanScript = script.replace(/\[\d+:\d+-\d+:\d+\]/g, '')
     
+    // Remove **Presenter** labels with asterisks
+    cleanScript = cleanScript.replace(/\*\*Presenter\*\*/gi, '')
+    
+    // Remove Presenter labels with timestamps like "Presenter (00:00-00:03):"
+    cleanScript = cleanScript.replace(/Presenter\s*\(\d+:\d+-\d+:\d+\)\s*:\s*/gi, '')
+    
+    // Remove standalone timestamps in parentheses like (00:00-00:03)
+    cleanScript = cleanScript.replace(/\(\d+:\d+-\d+:\d+\)\s*:\s*/g, '')
+    
+    // Remove any remaining **text** patterns (asterisk formatting)
+    cleanScript = cleanScript.replace(/\*\*(.*?)\*\*/g, '$1')
+    
     // Remove "A-ROLL:" and "B-ROLL:" labels
     cleanScript = cleanScript.replace(/A-ROLL:\s*/gi, '')
     cleanScript = cleanScript.replace(/B-ROLL:\s*/gi, '')
@@ -110,7 +122,8 @@ const heygenAPI = {
              !trimmed.toLowerCase().includes('a-roll') &&
              !trimmed.toLowerCase().includes('medium shot') &&
              !trimmed.toLowerCase().includes('close-up') &&
-             !trimmed.toLowerCase().includes('wide shot')
+             !trimmed.toLowerCase().includes('wide shot') &&
+             !trimmed.toLowerCase().startsWith('presenter')
     })
     
     return spokenLines.join(' ').replace(/\s+/g, ' ').trim()

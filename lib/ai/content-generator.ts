@@ -188,15 +188,16 @@ ${profileContext}
 
 Generate two scripts:
 
-1. **A-ROLL SCRIPT** (What the presenter says):
+1. A-ROLL SCRIPT (What the speaker says):
 - Hook in first 3 seconds
 - Clear, engaging narrative
 - ${profileData ? 'Match the creator\'s established tone and style' : 'Professional but conversational tone'}
 - Include trending keywords naturally
 - Strong call-to-action
 - 20-30 seconds of content
+- IMPORTANT: Write only the spoken dialogue - NO presenter labels, timestamps, or asterisk formatting
 
-2. **B-ROLL SCRIPT** (Visual directions with timestamps):
+2. B-ROLL SCRIPT (Visual directions with timestamps):
 Format: [MM:SS-MM:SS] Visual description
 - Specific visual cues synchronized with speech
 - Text overlays and graphics
@@ -204,11 +205,13 @@ Format: [MM:SS-MM:SS] Visual description
 - Platform-optimized elements
 
 ${profileData ? `
-3. **PERSONALIZATION NOTES**:
+3. PERSONALIZATION NOTES:
 Explain how the scripts were customized based on the creator's profile.
 ` : ''}
 
-Make it engaging and optimized for viral potential.`
+Make it engaging and optimized for viral potential.
+
+CRITICAL: The A-roll script should contain ONLY the spoken words without any labels, timestamps, or formatting. The voice agent will speak this directly.`
 
     const response = await openai.chat.completions.create({
       model: "gpt-4o",
@@ -219,10 +222,10 @@ Make it engaging and optimized for viral potential.`
 
     const content = response.choices[0]?.message?.content || ""
 
-    // Parse the response
-    const aRollMatch = content.match(/\*\*A-ROLL SCRIPT\*\*:?([\s\S]*?)(?=\*\*B-ROLL SCRIPT\*\*|$)/i)
-    const bRollMatch = content.match(/\*\*B-ROLL SCRIPT\*\*:?([\s\S]*?)(?=\*\*PERSONALIZATION NOTES\*\*|$)/i)
-    const notesMatch = content.match(/\*\*PERSONALIZATION NOTES\*\*:?([\s\S]*?)$/i)
+    // Parse the response - look for both asterisk and non-asterisk patterns
+    const aRollMatch = content.match(/(?:\*\*)?A-ROLL SCRIPT(?:\*\*)?:?([\s\S]*?)(?=(?:\*\*)?B-ROLL SCRIPT(?:\*\*)?|$)/i)
+    const bRollMatch = content.match(/(?:\*\*)?B-ROLL SCRIPT(?:\*\*)?:?([\s\S]*?)(?=(?:\*\*)?PERSONALIZATION NOTES(?:\*\*)?|$)/i)
+    const notesMatch = content.match(/(?:\*\*)?PERSONALIZATION NOTES(?:\*\*)?:?([\s\S]*?)$/i)
 
     return {
       aRoll: aRollMatch?.[1]?.trim() || "Script generation failed - please try again",
