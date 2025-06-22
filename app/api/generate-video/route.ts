@@ -1,4 +1,4 @@
-export const maxDuration = 120
+export const maxDuration = 60 // Maximum for Vercel Hobby plan
 
 export async function POST(req: Request) {
   try {

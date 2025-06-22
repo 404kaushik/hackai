@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -60,24 +60,28 @@ import {
 } from 'recharts'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 
+// NEW: Dynamic Media Components
+import { MediaSelector, MediaItem, BrollSegment } from '@/components/media-selector'
+import { CompositionPreview } from '@/components/composition-preview'
+import { CompositionSettings, CompositionSettings as ICompositionSettings } from '@/components/composition-settings'
+import { videoComposer, VideoSegment } from '@/lib/video-composer'
+
 type Tab = "create" | "library" | "settings"
 type GenerationStep = "input" | "analysis" | "storyboard" | "video"
 
 // HeyGen API Configuration
 // Using your actual HeyGen API token as provided by HeyGen
-const HEYGEN_API_KEY = 'NDkzMWIyMzUxMzY1NDZhZWE0ZGFmZmU5ZWJlYmQ4ZTMtMTc1MDUyNDk5Mg==' // Your actual HeyGen API token
 
 const HEYGEN_BASE_URL = 'https://api.heygen.com'
 
 // Pexels API Configuration
-const PEXELS_API_KEY = 'hib9VuJK7n90ypzjwcD2Y0pCqeOwUALpICzvld0CZKdfXYB8p0xLPPqb'
 const PEXELS_BASE_URL = 'https://api.pexels.com/videos'
 
 
 // Helper function to get the API key
 const getApiKey = () => {
   // Use the API token directly as provided by HeyGen
-  return HEYGEN_API_KEY
+  return process.env.HEYGEN_API_KEY
 }
 
 
@@ -134,18 +138,18 @@ const heygenAPI = {
     try {
       // Get the API key (HeyGen token format)
       const apiKey = getApiKey()
-      console.log('Testing HeyGen API token (first 10 chars):', apiKey.substring(0, 10) + '...')
-      console.log('API token length:', apiKey.length)
+      console.log('Testing HeyGen API token (first 10 chars):', apiKey?.substring(0, 10) + '...')
+      console.log('API token length:', apiKey?.length)
       console.log('API token format check:', {
-        isBase64Format: /^[A-Za-z0-9+/]*={0,2}$/.test(apiKey),
-        length: apiKey.length,
-        endsWithEquals: apiKey.endsWith('=') || apiKey.endsWith('==')
+        isBase64Format: /^[A-Za-z0-9+/]*={0,2}$/.test(apiKey || ''),
+        length: apiKey?.length,
+        endsWithEquals: apiKey?.endsWith('=') || apiKey?.endsWith('==')
       })
       
       const response = await fetch(`${HEYGEN_BASE_URL}/v2/avatars?limit=1`, {
         headers: {
           'Accept': 'application/json',
-          'X-Api-Key': apiKey,
+          'X-Api-Key': apiKey || '',
         },
       })
       
@@ -180,7 +184,7 @@ const heygenAPI = {
       const response = await fetch(`${HEYGEN_BASE_URL}/v2/avatars`, {
         headers: {
           'Accept': 'application/json',
-          'X-Api-Key': getApiKey(),
+          'X-Api-Key': getApiKey() || '',
         },
       })
       
@@ -201,7 +205,7 @@ const heygenAPI = {
       const response = await fetch(`${HEYGEN_BASE_URL}/v2/voices`, {
         headers: {
           'Accept': 'application/json',
-          'X-Api-Key': getApiKey(),
+          'X-Api-Key': getApiKey() || '',
         },
       })
       
@@ -223,7 +227,7 @@ const heygenAPI = {
         method: 'POST',
         headers: {
           'Content-Type': file.type,
-          'X-Api-Key': getApiKey(),
+          'X-Api-Key': getApiKey() || '',
         },
         body: file
       })
@@ -288,7 +292,7 @@ const heygenAPI = {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-Api-Key': getApiKey(),
+          'X-Api-Key': getApiKey() || '',
         },
         body: JSON.stringify({
           video_inputs: [
@@ -347,7 +351,7 @@ const heygenAPI = {
       const response = await fetch(`${HEYGEN_BASE_URL}/v1/video_status.get?video_id=${videoId}`, {
         headers: {
           'Accept': 'application/json',
-          'X-Api-Key': getApiKey(),
+          'X-Api-Key': getApiKey() || '',
         },
       })
       const data = await response.json()
@@ -430,7 +434,7 @@ const pexelsAPI = {
     try {
       const response = await fetch(`${PEXELS_BASE_URL}/search?query=${encodeURIComponent(query)}&per_page=${perPage}&orientation=landscape`, {
         headers: {
-          'Authorization': PEXELS_API_KEY
+          'Authorization': process.env.PEXELS_API_KEY || ''   
         }
       })
       
@@ -855,6 +859,25 @@ export default function Dashboard() {
     { name: 'Finalizing...', completed: false, active: false }
   ])
 
+  // NEW: Dynamic Media State Variables
+  const [selectedMedia, setSelectedMedia] = useState<{[timeRange: string]: MediaItem}>({})
+  const [compositionSegments, setCompositionSegments] = useState<VideoSegment[]>([])
+  const [isComposing, setIsComposing] = useState(false)
+  const [compositionProgress, setCompositionProgress] = useState(0)
+  const [compositionStage, setCompositionStage] = useState('')
+  const [finalComposedVideo, setFinalComposedVideo] = useState<string | null>(null)
+
+  // NEW: Composition Settings State
+  const [compositionSettings, setCompositionSettings] = useState<ICompositionSettings>({
+    width: 720,
+    height: 1280,
+    fps: 30,
+    format: 'mp4',
+    quality: 'medium',
+    overlayStyle: 'pip',
+    overlaySize: 30
+  })
+
   // Load avatars and voices on component mount
   useEffect(() => {
     const loadHeyGenData = async () => {
@@ -943,60 +966,6 @@ export default function Dashboard() {
 
 
   // Handle video events
-  // useEffect(() => {
-  //   if (currentStep === "video") {
-  //     const video = document.getElementById("phone-video") as HTMLVideoElement
-  //     const overlay = document.getElementById("video-overlay")
-  //     const endedOverlay = document.getElementById("video-ended")
-
-  //     if (video && overlay && endedOverlay) {
-  //       const handleVideoLoaded = () => {
-  //         video.currentTime = 0.5
-  //       }
-  //       const handleVideoCanPlay = () => {
-  //         if (video.paused) video.currentTime = 0.5
-  //       }
-  //       const handleVideoError = (e: Event) => console.error("Video loading error:", e)
-  //       const handleVideoEnded = () => {
-  //         overlay.style.opacity = "1"
-  //         overlay.style.pointerEvents = "auto"
-  //         endedOverlay.style.opacity = "1"
-  //         endedOverlay.style.pointerEvents = "auto"
-  //       }
-  //       const handleVideoPlay = () => {
-  //         overlay.style.opacity = "0"
-  //         overlay.style.pointerEvents = "none"
-  //         endedOverlay.style.opacity = "0"
-  //         endedOverlay.style.pointerEvents = "none"
-  //       }
-  //       const handleVideoPause = () => {
-  //         overlay.style.opacity = "1"
-  //         overlay.style.pointerEvents = "auto"
-  //       }
-
-  //       video.addEventListener("loadedmetadata", handleVideoLoaded)
-  //       video.addEventListener("canplay", handleVideoCanPlay)
-  //       video.addEventListener("error", handleVideoError)
-  //       video.addEventListener("ended", handleVideoEnded)
-  //       video.addEventListener("play", handleVideoPlay)
-  //       video.addEventListener("pause", handleVideoPause)
-
-  //       video.src = generatedVideoUrl
-  //       video.load()
-
-  //       return () => {
-  //         video.removeEventListener("loadedmetadata", handleVideoLoaded)
-  //         video.removeEventListener("canplay", handleVideoCanPlay)
-  //         video.removeEventListener("error", handleVideoError)
-  //         video.removeEventListener("ended", handleVideoEnded)
-  //         video.removeEventListener("play", handleVideoPlay)
-  //         video.removeEventListener("pause", handleVideoPause)
-  //       }
-  //     }
-  //   }
-  // }, [currentStep, generatedVideoUrl])
-
-  // Handle video events
   useEffect(() => {
     if (currentStep === 'video') {
       const video = document.getElementById('phone-video') as HTMLVideoElement;
@@ -1068,6 +1037,53 @@ export default function Dashboard() {
       }
     }
   }, [currentStep, brollFootage.length, bRollScript]);
+
+  // NEW: Dynamic Media Helper Functions
+  const parseBrollSegments = useCallback((brollScript: string): BrollSegment[] => {
+    const lines = brollScript.split('\n').filter(line => line.trim())
+    const segments: BrollSegment[] = []
+    
+    for (const line of lines) {
+      const timeMatch = line.match(/\[(\d+):(\d+)-(\d+):(\d+)\]/)
+      if (!timeMatch) continue
+      
+      const startMinutes = parseInt(timeMatch[1])
+      const startSeconds = parseInt(timeMatch[2])
+      const endMinutes = parseInt(timeMatch[3])
+      const endSeconds = parseInt(timeMatch[4])
+      
+      const startTime = startMinutes * 60 + startSeconds
+      const endTime = endMinutes * 60 + endSeconds
+      
+      const timeRange = `${timeMatch[1]}:${timeMatch[2]}-${timeMatch[3]}:${timeMatch[4]}`
+      
+      segments.push({
+        timeRange,
+        startTime,
+        endTime,
+        duration: endTime - startTime,
+        description: line.replace(/\[\d+:\d+-\d+:\d+\]/, '').replace(/B-ROLL[:\s]*/gi, '').trim(),
+        selectedMedia: selectedMedia[timeRange]
+      })
+    }
+    
+    return segments
+  }, [selectedMedia])
+
+  const handleMediaSelect = (timeRange: string, media: MediaItem) => {
+    setSelectedMedia(prev => ({
+      ...prev,
+      [timeRange]: media
+    }))
+  }
+
+  const handleMediaRemove = (timeRange: string) => {
+    setSelectedMedia(prev => {
+      const updated = { ...prev }
+      delete updated[timeRange]
+      return updated
+    })
+  }
 
   const phases = [
     { name: "Initializing HeyGen AI...", duration: 2000 },
@@ -1542,6 +1558,82 @@ export default function Dashboard() {
       setTimeout(() => setShowToast(false), 5000)
     } finally {
       setIsGeneratingScripts(false)
+    }
+  }
+
+  // NEW: Video Composition Handler
+  const handleStartComposition = async () => {
+    if (!generatedVideoUrl || !aRollScript || !bRollScript) {
+      alert('Please generate the avatar video first')
+      return
+    }
+
+    setIsComposing(true)
+    setCompositionProgress(0)
+    setCompositionStage('Preparing composition...')
+
+    try {
+      // Start server-side composition with streaming
+      const response = await fetch('/api/compose-video', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          aRollScript,
+          bRollScript,
+          avatarVideoUrl: generatedVideoUrl,
+          selectedMedia,
+          settings: compositionSettings
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
+      // Handle streaming response
+      const reader = response.body?.getReader()
+      if (!reader) throw new Error('No response body')
+
+      const decoder = new TextDecoder()
+      let buffer = ''
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split('\n')
+        buffer = lines.pop() || ''
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const data = JSON.parse(line.slice(6))
+              
+              if (data.error) {
+                throw new Error(data.message || 'Composition failed')
+              }
+
+              setCompositionStage(data.stage || 'Processing...')
+              setCompositionProgress(data.progress || 0)
+
+              if (data.success && data.videoUrl) {
+                setFinalComposedVideo(data.videoUrl)
+                console.log('✅ Video composition completed!', data.videoUrl)
+              }
+            } catch (parseError) {
+              console.warn('Failed to parse SSE data:', line)
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error('❌ Composition failed:', error)
+      alert(`Composition failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    } finally {
+      setIsComposing(false)
     }
   }
 
@@ -3244,8 +3336,49 @@ export default function Dashboard() {
                     </Card>
                   </div>
 
+                  {/* NEW: Dynamic Media Selection */}
+                  {bRollScript && (
+                    <div className="space-y-6">
+                      <div className="text-center">
+                        <div className="inline-flex items-center space-x-2 bg-gradient-to-r from-purple-50 to-blue-50 px-4 py-2 rounded-full mb-4">
+                          <Video className="w-4 h-4 text-purple-600" />
+                          <span className="text-sm font-medium text-purple-700">Dynamic Media Selection</span>
+                        </div>
+                        <h3 className="text-xl font-bold text-slate-900 mb-2">Customize Your B-roll Content</h3>
+                        <p className="text-slate-600">
+                          Select videos or images for each B-roll segment to create engaging, dynamic content
+                        </p>
+                      </div>
+
+                      {/* Composition Settings */}
+                      <CompositionSettings
+                        settings={compositionSettings}
+                        onSettingsChange={setCompositionSettings}
+                        className="mb-6"
+                      />
+
+                      <MediaSelector
+                        segments={parseBrollSegments(bRollScript)}
+                        onMediaSelect={handleMediaSelect}
+                        onMediaRemove={handleMediaRemove}
+                      />
+
+                      {/* Composition Preview */}
+                      {compositionSegments.length > 0 && (
+                        <CompositionPreview
+                          segments={compositionSegments}
+                          totalDuration={Math.max(...compositionSegments.map(s => s.endTime))}
+                          avatarVideoUrl={generatedVideoUrl}
+                          isProcessing={isComposing}
+                          processingProgress={compositionProgress}
+                          processingStage={compositionStage}
+                          onStartComposition={handleStartComposition}
+                        />
+                      )}
+                    </div>
+                  )}
+
                   {/* Enhanced Generate Video Button */}
-                  {/* Generate Video Button */}
                   <div className="flex justify-center">
                     <div className="text-center">
                       {/* Caption info */}
@@ -3287,8 +3420,15 @@ export default function Dashboard() {
               {currentStep === 'video' && (
                 <div className="space-y-8">
                   <div className="text-center mb-8 relative">
-                    <h1 className="text-3xl font-bold text-slate-900 mb-2">Your AI-Generated Video</h1>
-                    <p className="text-slate-600">Your content is ready to share with the world!</p>
+                    <h1 className="text-3xl font-bold text-slate-900 mb-2">
+                      {finalComposedVideo ? 'Your Composed Video is Ready!' : 'Your AI-Generated Video'}
+                    </h1>
+                    <p className="text-slate-600">
+                      {finalComposedVideo 
+                        ? 'Avatar video with your selected B-roll footage and images'
+                        : 'Your content is ready to share with the world!'
+                      }
+                    </p>
                     
                     {/* Back Button - Top Left */}
                     <Button
@@ -3318,22 +3458,22 @@ export default function Dashboard() {
                               loop
                               playsInline
                               preload="auto"
-                              key={generatedVideoUrl || "/HackAI Demo.mp4"}
+                              key={finalComposedVideo || generatedVideoUrl || "/HackAI Demo.mp4"}
                               onError={(e) => {
                                 console.error('Video playback error:', e)
-                                // Fallback to demo video if HeyGen video fails
+                                // Fallback to demo video if videos fail
                                 const video = e.target as HTMLVideoElement
-                                if (video.src !== "/HackAI Demo.mp4" && !generatedVideoUrl) {
+                                if (video.src !== "/HackAI Demo.mp4" && !finalComposedVideo && !generatedVideoUrl) {
                                   video.src = "/HackAI Demo.mp4"
                                 }
                               }}
                               onLoadedData={() => {
-                                console.log('Video loaded successfully:', generatedVideoUrl || "/HackAI Demo.mp4")
+                                console.log('Video loaded successfully:', finalComposedVideo || generatedVideoUrl || "/HackAI Demo.mp4")
                               }}
                             >
-                              {/* Use HeyGen generated video if available, otherwise fallback to demo */}
+                              {/* Use final composed video if available, then HeyGen video, then demo */}
                               <source 
-                                src={generatedVideoUrl || "/HackAI Demo.mp4"} 
+                                src={finalComposedVideo || generatedVideoUrl || "/HackAI Demo.mp4"} 
                                 type="video/mp4" 
                               />
                               {/* Fallback for browsers that don't support video */}
@@ -3426,7 +3566,7 @@ export default function Dashboard() {
                             <Clock className="w-8 h-8 mx-auto mb-2 text-indigo-600" />
                             <p className="text-sm text-slate-600">Duration</p>
                             <p className="text-lg font-semibold text-slate-900">
-                              {generatedVideoUrl && generatedVideoUrl.startsWith('http') ? 'AI Generated' : 'Demo Video'}
+                              {finalComposedVideo || generatedVideoUrl || "Demo Video"}
                             </p>
                           </CardContent>
                         </Card>
@@ -3451,61 +3591,79 @@ export default function Dashboard() {
                             </div>
                             <p className="text-sm text-slate-600">Captions</p>
                             <p className="text-lg font-semibold text-slate-900">
-                              {generatedVideoUrl && generatedVideoUrl.includes('caption') ? 'Embedded' : 'Auto-Generated'}
+                              {finalComposedVideo || generatedVideoUrl || "Auto-Generated"}
                             </p>
                           </CardContent>
                         </Card>
           </div>
 
-                      {/* Performance Prediction */}
-                      <Card className="bg-gradient-to-r from-green-50 to-emerald-50 border-green-200">
-              <CardHeader>
-                          <CardTitle className="flex items-center text-green-800">
-                            <TrendingUp className="w-5 h-5 mr-2" />
-                            {generatedVideoUrl && generatedVideoUrl.startsWith('http') ? 'HeyGen AI Generated Video' : 'Demo Video'}
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                          <div className="text-center">
-                            <div>
-                              <p className="text-2xl font-bold text-green-700">
-                                {generatedVideoUrl && generatedVideoUrl.startsWith('http') ? '✨ AI Avatar Video' : '🎬 Demo Video'}
-                              </p>
-                              <p className="text-sm text-green-600">
-                                {generatedVideoUrl && generatedVideoUrl.startsWith('http') ? 
-                                  'Generated using HeyGen API with auto-captions' : 
-                                  'Demo video - Generate with HeyGen for real results'
-                                }
-                              </p>
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-
                       {/* Action Buttons */}
-                      <div className="space-y-3">
-                        <Button 
-                          className="w-full bg-indigo-600 hover:bg-indigo-700 text-lg py-3"
+                      <div className="space-y-4">
+                        {/* Show compose button if we have selected media OR if we're in the process of composing */}
+                        {!finalComposedVideo && (Object.keys(selectedMedia).length > 0 || isComposing) && (
+                          <Button
+                            onClick={handleStartComposition}
+                            disabled={isComposing || Object.keys(selectedMedia).length === 0}
+                            className="w-full bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-700 hover:to-blue-700 text-white py-3"
+                          >
+                            {isComposing ? (
+                              <>
+                                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                                Composing with B-roll... ({Math.round(compositionProgress)}%)
+                                <div className="ml-2 text-xs">
+                                  {compositionStage}
+                                </div>
+                              </>
+                            ) : (
+                              <>
+                                <Video className="w-4 h-4 mr-2" />
+                                Compose with B-roll ({Object.keys(selectedMedia).length} segments)
+                              </>
+                            )}
+                          </Button>
+                        )}
+
+                        {/* Show instruction if no B-roll selected */}
+                        {!finalComposedVideo && Object.keys(selectedMedia).length === 0 && !isComposing && (
+                          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                            <div className="flex items-center space-x-2 text-blue-700">
+                              <Video className="w-5 h-5" />
+                              <span className="font-medium">Ready to add B-roll content?</span>
+                            </div>
+                            <p className="text-sm text-blue-600 mt-1">
+                              Go back to the Storyboard step to select videos or images for your B-roll segments, 
+                              then return here to compose your final video.
+                            </p>
+                            <Button
+                              variant="outline"
+                              onClick={() => handleStepChange('storyboard')}
+                              className="mt-3 border-blue-300 text-blue-700 hover:bg-blue-100"
+                            >
+                              <ArrowLeft className="w-4 h-4 mr-2" />
+                              Select B-roll Content
+                            </Button>
+                          </div>
+                        )}
+
+                        <Button
                           onClick={() => {
-                            const videoUrl = generatedVideoUrl
-                            if (videoUrl && videoUrl.startsWith('http')) {
-                              window.open(videoUrl, '_blank')
-                            } else if (videoUrl) {
-                              const link = document.createElement('a')
-                              link.href = videoUrl
-                              link.download = 'generated-video.mp4'
-                              document.body.appendChild(link)
-                              link.click()
-                              document.body.removeChild(link)
-                            } else {
-                              alert('No video available for download')
+                            const videoUrl = finalComposedVideo || generatedVideoUrl
+                            if (videoUrl) {
+                              const a = document.createElement('a')
+                              a.href = videoUrl
+                              a.download = 'supernova-video.mp4'
+                              document.body.appendChild(a)
+                              a.click()
+                              document.body.removeChild(a)
                             }
                           }}
-                          disabled={!generatedVideoUrl}
+                          className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white py-3"
+                          disabled={!finalComposedVideo && !generatedVideoUrl}
                         >
-                          <Download className="w-5 h-5 mr-2" />
-                          {generatedVideoUrl && generatedVideoUrl.startsWith('http') ? 'Open Video' : 'Download Video'}
+                          <Download className="w-4 h-4 mr-2" />
+                          Download Video
                         </Button>
+
                         <div className="grid grid-cols-2 gap-3">
                           <Button 
                             variant="outline" 
@@ -3525,42 +3683,30 @@ export default function Dashboard() {
                             <Save className="w-4 h-4 mr-2" />
                             Save to Library
                           </Button>
-                    </div>
-                  </div>
+                        </div>
+                      </div>
 
                       {/* Success Message */}
                       <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4">
                         <div className="flex items-center space-x-2 text-emerald-700">
                           <Check className="w-5 h-5" />
                           <span className="font-medium">
-                            {generatedVideoUrl && generatedVideoUrl.startsWith('http')
-                              ? generatedVideoUrl.includes('caption') 
-                                ? 'Video generated successfully with embedded HeyGen captions!' 
-                                : 'Video generated successfully with HeyGen AI!'
-                              : 'Demo video ready - Generate with HeyGen for real AI video with captions!'
+                            {finalComposedVideo 
+                              ? 'Composed video with B-roll content ready!'
+                              : generatedVideoUrl 
+                                ? 'Video generated successfully with HeyGen AI!'
+                                : 'Demo video ready - Generate with HeyGen for real AI video!'
                             }
                           </span>
                         </div>
                         
-                        {/* Add caption info */}
-                        {generatedVideoUrl && generatedVideoUrl.includes('caption') && (
+                        {finalComposedVideo && (
                           <div className="mt-2 text-sm text-emerald-600">
-                            ✨ This video includes stylized captions with gold highlights and rounded backgrounds as configured in your HeyGen settings.
+                            ✨ This video includes your custom B-roll content and maintains professional quality.
                           </div>
                         )}
                       </div>
                     </div>
-                  </div>
-
-                  {/* Navigation */}
-                  <div className="flex justify-center items-center pt-4">
-                    <Button
-                      onClick={handleAddToLibrary}
-                      className="bg-emerald-600 hover:bg-emerald-700 flex items-center"
-                    >
-                      Add to Library
-                      <Plus className="w-4 h-4 ml-2" />
-                    </Button>
                   </div>
                 </div>
               )}
@@ -3608,9 +3754,9 @@ export default function Dashboard() {
                             <Edit className="w-3 h-3 mr-1" />
                             Edit
                           </Button>
-                </div>
-              </CardContent>
-            </Card>
+                        </div>
+                      </CardContent>
+                    </Card>
                   ))}
                 </div>
               ) : (
@@ -3640,686 +3786,117 @@ export default function Dashboard() {
               <div className="space-y-6">
                 {/* Profile Settings */}
                 <Card className="shadow-md">
-              <CardHeader>
+                  <CardHeader>
                     <CardTitle>Profile Information</CardTitle>
-              </CardHeader>
+                  </CardHeader>
                   <CardContent className="space-y-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
                         <Label htmlFor="name">Name</Label>
                         <Input id="name" defaultValue="Kevin Valencia" />
-                    </div>
+                      </div>
                       <div>
                         <Label htmlFor="email">Email</Label>
                         <Input id="email" type="email" defaultValue="alex@example.com" />
-                  </div>
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
 
-                {/* HeyGen Configuration */}
-                <Card className="shadow-md">
-                  <CardHeader>
-                    <CardTitle>HeyGen AI Configuration</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                <div className="space-y-4">
-                      <div>
-                        <Label htmlFor="avatar-select">Select Avatar</Label>
-                        <select
-                          id="avatar-select"
-                          value={selectedAvatarId}
-                          onChange={(e) => setSelectedAvatarId(e.target.value)}
-                          className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                        >
-                          <option value="">Select an avatar...</option>
-                          {availableAvatars.map((avatar) => (
-                            <option key={avatar.avatar_id} value={avatar.avatar_id}>
-                              {avatar.avatar_name} ({avatar.gender})
-                            </option>
-                          ))}
-                        </select>
-                        <p className="text-sm text-slate-600 mt-1">
-                          {availableAvatars.length} avatars available
-                        </p>
-                    </div>
-                      
-                      <div>
-                        <Label htmlFor="voice-select">Select Voice</Label>
-                        <select
-                          id="voice-select"
-                          value={selectedVoiceId}
-                          onChange={(e) => setSelectedVoiceId(e.target.value)}
-                          className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                        >
-                          <option value="">Select a voice...</option>
-                          {availableVoices.map((voice) => (
-                            <option key={voice.voice_id} value={voice.voice_id}>
-                              {voice.name} ({voice.language} - {voice.gender})
-                            </option>
-                          ))}
-                        </select>
-                        <p className="text-sm text-slate-600 mt-1">
-                          {availableVoices.length} voices available
-                        </p>
-                  </div>
-                      
-                      {/* Caption Feature Info */}
-                      <div className="bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-200 rounded-lg p-4">
-                        <div className="flex items-center space-x-2 mb-2">
-                          <div className="w-6 h-6 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full flex items-center justify-center">
-                            <span className="text-white text-xs font-bold">CC</span>
-                    </div>
-                          <h4 className="font-semibold text-indigo-900">Automatic Captions</h4>
-                  </div>
-                        <p className="text-sm text-indigo-700 mb-2">
-                          All generated videos include stylized captions with:
-                        </p>
-                        <ul className="text-xs text-indigo-600 space-y-1 ml-4">
-                          <li>• Gold highlighted text for emphasis</li>
-                          <li>• Semi-transparent rounded backgrounds</li>
-                          <li>• Bottom positioning for mobile viewing</li>
-                          <li>• Automatic timestamp removal from speech</li>
-                        </ul>
-                    </div>
-                  </div>
-                    
-                    {/* Connection Status */}
-                    <div className={`rounded-lg p-4 border ${
-                      apiStatus.testing ? 'bg-yellow-50 border-yellow-200' :
-                      apiStatus.connected ? 'bg-green-50 border-green-200' : 
-                      'bg-red-50 border-red-200'
-                    }`}>
-                      <div className="flex items-center space-x-2 mb-2">
-                        <div className={`w-3 h-3 rounded-full ${
-                          apiStatus.testing ? 'bg-yellow-500' :
-                          apiStatus.connected ? 'bg-green-500' : 'bg-red-500'
-                        }`}></div>
-                        <span className={`text-sm font-medium ${
-                          apiStatus.testing ? 'text-yellow-900' :
-                          apiStatus.connected ? 'text-green-900' : 'text-red-900'
-                        }`}>
-                          {apiStatus.testing ? 'Testing HeyGen API...' :
-                           apiStatus.connected ? 'HeyGen API Connected' : 
-                           'HeyGen API Disconnected'}
-                        </span>
-                      </div>
-                      
-                      {apiStatus.error && (
-                        <p className="text-sm text-red-600 mb-2">
-                          Error: {apiStatus.error}
-                        </p>
-                      )}
-                      
-                      {apiStatus.connected && (
-                        <>
-                          <p className="text-sm text-green-600">
-                            Avatar: {availableAvatars.find(a => a.avatar_id === selectedAvatarId)?.avatar_name || 'None selected'}
-                            {(customAvatarId === selectedAvatarId && hasUploadedVideo) && (
-                              <span className="ml-2 text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded">Custom</span>
-                            )}
-                          </p>
-                          <p className="text-sm text-green-600">
-                            Voice: {availableVoices.find(v => v.voice_id === selectedVoiceId)?.name || 'None selected'}
-                          </p>
-                          {uploadedVideo.assetId && (
-                            <p className="text-sm text-green-600 mt-2">
-                              Training Video: Uploaded (Asset ID: {uploadedVideo.assetId})
-                            </p>
-                          )}
-                        </>
-                      )}
-                      
-                      {!apiStatus.connected && !apiStatus.testing && (
-                        <div className="mt-2">
-                          <p className="text-sm text-red-600 mb-2">
-                            Please check your HeyGen API key configuration.
-                          </p>
-                          
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={async () => {
-                              setApiStatus(prev => ({ ...prev, testing: true, error: null }))
-                              try {
-                                const isValid = await heygenAPI.testApiKey()
-                                if (isValid) {
-                                  // Reload data
-                                  const [avatars, voices] = await Promise.all([
-                                    heygenAPI.getAvatars(),
-                                    heygenAPI.getVoices()
-                                  ])
-                                  setAvailableAvatars(avatars)
-                                  setAvailableVoices(voices)
-                                  setApiStatus({ connected: true, testing: false, error: null })
-                                } else {
-                                  setApiStatus({ connected: false, testing: false, error: 'Invalid API key' })
-                                }
-                              } catch (error) {
-                                setApiStatus({ 
-                                  connected: false, 
-                                  testing: false, 
-                                  error: error instanceof Error ? error.message : 'Connection failed' 
-                                })
-                              }
-                            }}
-                            disabled={apiStatus.testing}
-                          >
-                            {apiStatus.testing ? (
-                              <>
-                                <div className="w-3 h-3 border-2 border-gray-400 border-t-transparent rounded-full animate-spin mr-2" />
-                                Testing...
-                              </>
-                            ) : (
-                              <>
-                                <RefreshCw className="w-3 h-3 mr-2" />
-                                Retry Connection
-                              </>
-                            )}
-                          </Button>
-                        </div>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* Preferences */}
-                <Card className="shadow-md">
-                  <CardHeader>
-                    <CardTitle>Preferences</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                  <div className="flex items-center justify-between">
-                      <div>
-                        <Label htmlFor="dark-mode">Dark Mode</Label>
-                        <p className="text-sm text-slate-600">Toggle dark mode interface</p>
-                    </div>
-                      <Switch id="dark-mode" />
-                  </div>
-                  <div className="flex items-center justify-between">
-                      <div>
-                        <Label htmlFor="notifications">Email Notifications</Label>
-                        <p className="text-sm text-slate-600">Receive email updates</p>
-                    </div>
-                      <Switch id="notifications" defaultChecked />
-                </div>
-              </CardContent>
-            </Card>
-
-                {/* AI Avatar Upload */}
-                <Card className="shadow-md">
-              <CardHeader>
-                    <CardTitle>AI Avatar Video Upload</CardTitle>
-              </CardHeader>
-                  <CardContent className="space-y-4">
-                    <p className="text-sm text-slate-600 mb-4">
-                      Upload a video of yourself to create a custom AI avatar. Your avatar will be automatically processed and ready for content generation.
-                    </p>
-                    
-                    {/* Avatar Creation Progress */}
-                    {avatarCreation.isProcessing && (
-                      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-6 border border-blue-200 mb-4">
-                        <div className="flex items-center space-x-3 mb-4">
-                          <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-500 rounded-full flex items-center justify-center">
-                            <User className="w-4 h-4 text-white" />
-                  </div>
-                          <div>
-                            <h4 className="font-semibold text-blue-900">Creating Your AI Avatar</h4>
-                            <p className="text-sm text-blue-700">Estimated time: {avatarCreation.estimatedTime}</p>
-                  </div>
-                  </div>
-                        
-                        {/* Progress Bar */}
-                        <div className="mb-4">
-                          <div className="flex justify-between items-center mb-2">
-                            <span className="text-sm font-medium text-blue-900">{avatarCreation.phase}</span>
-                            <span className="text-sm text-blue-700">{avatarCreation.progress}%</span>
-                  </div>
-                          <div className="w-full bg-blue-200 rounded-full h-2">
-                            <div 
-                              className="h-2 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full transition-all duration-500 ease-out" 
-                              style={{ width: `${avatarCreation.progress}%` }}
-                            ></div>
-                          </div>
-                        </div>
-                        
-                        
-                        {/* Current Phase Indicator */}
-                        <div className="flex items-center space-x-2 text-blue-700">
-                          <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-                          <span className="text-sm">{avatarCreation.phase}</span>
-                        </div>
-                      </div>
-                    )}
-                    
-                    {/* Video Upload Section */}
-                    <div className="space-y-4">
-                      <div>
-                        <Label htmlFor="video-upload">Upload Avatar Training Video</Label>
-                        <div className="mt-2">
-                          <input
-                            id="video-upload"
-                            type="file"
-                            accept="video/*"
-                            onChange={handleVideoUpload}
-                            disabled={uploadedVideo.uploading || avatarCreation.isProcessing}
-                            className="hidden"
-                          />
-                          <Button
-                            onClick={() => document.getElementById('video-upload')?.click()}
-                            variant="outline"
-                            className="w-full"
-                            disabled={uploadedVideo.uploading || avatarCreation.isProcessing}
-                          >
-                            {uploadedVideo.uploading ? (
-                              <>
-                                <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin mr-2" />
-                                Uploading...
-                              </>
-                            ) : avatarCreation.isProcessing ? (
-                              <>
-                                <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mr-2" />
-                                Creating Avatar...
-                              </>
-                            ) : (
-                              <>
-                                <Upload className="w-4 h-4 mr-2" />
-                                Choose Video File
-                              </>
-                            )}
-                          </Button>
-                        </div>
-                        <p className="text-xs text-slate-500 mt-1">
-                          Supported formats: MP4, WebM. Max size: 500MB. Recommended: 2-minute video with clear face visibility.
-                        </p>
-                      </div>
-                    </div>
-                    
-                    {/* Video Preview */}
-                    {(uploadedVideo.file || uploadedVideo.url) && (
-                      <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
-                        <div className="flex items-start space-x-4">
-                          {/* Video Preview */}
-                          <div className="flex-shrink-0">
-                            <div className="relative w-32 h-24 bg-black rounded-lg overflow-hidden">
-                              {uploadedVideo.url ? (
-                                <video 
-                                  className="w-full h-full object-cover"
-                                  controls
-                                  preload="metadata"
-                                >
-                                  <source src={uploadedVideo.url} type={uploadedVideo.file?.type || 'video/mp4'} />
-                                  Your browser does not support the video tag.
-                                </video>
-                              ) : (
-                                <div className="w-full h-full flex items-center justify-center bg-slate-200">
-                                  <Video className="w-8 h-8 text-slate-400" />
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                          
-                          {/* Video Info */}
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center space-x-2 mb-2">
-                              <div className={`w-3 h-3 rounded-full ${
-                                avatarCreation.isProcessing ? 'bg-blue-500' :
-                                uploadedVideo.uploading ? 'bg-yellow-500' : 
-                                uploadedVideo.assetId ? 'bg-green-500' : 'bg-gray-400'
-                              }`}></div>
-                              <span className="text-sm font-medium text-slate-900">
-                                {avatarCreation.isProcessing ? 'Creating Avatar...' :
-                                 uploadedVideo.uploading ? 'Uploading...' :
-                                 uploadedVideo.assetId ? 'Upload Complete' : 'Ready to Upload'}
-                              </span>
-                            </div>
-                            <p className="text-sm text-slate-600 mb-1">
-                              {uploadedVideo.file?.name || 'No file selected'}
-                            </p>
-                            <p className="text-xs text-slate-500">
-                              {uploadedVideo.file ? `Size: ${(uploadedVideo.file.size / (1024 * 1024)).toFixed(1)}MB` : ''}
-                              {uploadedVideo.assetId && (
-                                <span className="block">Asset ID: {uploadedVideo.assetId}</span>
-                              )}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Avatar Creation Status */}
-                    <div className={`rounded-lg p-4 border ${
-                      (customAvatarId && hasUploadedVideo) ? 'bg-green-50 border-green-200' : 
-                      avatarCreation.isProcessing ? 'bg-blue-50 border-blue-200' : 
-                      'bg-blue-50 border-blue-200'
-                    }`}>
-                      <h4 className={`font-medium mb-2 ${
-                        (customAvatarId && hasUploadedVideo) ? 'text-green-900' : 
-                        avatarCreation.isProcessing ? 'text-blue-900' : 
-                        'text-blue-900'
-                      }`}>
-                        {(customAvatarId && hasUploadedVideo) ? '✅ Kevin\'s Custom Avatar is Ready!' : 
-                         avatarCreation.isProcessing ? '🔄 Creating Kevin\'s Avatar...' : 
-                         '📝 Create Kevin\'s AI Avatar'}
-                      </h4>
-                      <div className={`text-sm space-y-1 ${
-                        (customAvatarId && hasUploadedVideo) ? 'text-green-700' : 
-                        avatarCreation.isProcessing ? 'text-blue-700' : 
-                        'text-blue-700'
-                      }`}>
-                        {(customAvatarId && hasUploadedVideo) ? (
-                          <>
-                            <p>✅ Kevin's custom avatar has been created and is ready to use!</p>
-                            <p>✅ It will be automatically selected for video generation</p>
-                            <p>✅ You can now create videos with Kevin's personal AI avatar</p>
-                          </>
-                        ) : avatarCreation.isProcessing ? (
-                          <>
-                            <p>🔄 Your video is being processed to create Kevin's custom avatar</p>
-                            <p>⏱️ Demo mode: ~{avatarCreation.estimatedTime} (accelerated for demo)</p>
-                            <p>🔔 You'll be notified when Kevin's avatar is ready</p>
-                          </>
-                        ) : (
-                          <>
-                            <p>1. Upload a 2-minute video of Kevin speaking clearly</p>
-                            <p>2. Our AI will automatically process the video</p>
-                            <p>3. Kevin's custom avatar will be ready in ~30 seconds</p>
-                            <p>4. Start creating videos with Kevin's personal AI avatar!</p>
-                            <div className="mt-3 p-2 bg-blue-100 border border-blue-300 rounded text-xs">
-                              <p><strong>Demo Mode:</strong> Avatar creation is accelerated for demonstration purposes. The system creates a fully functional Kevin avatar that can be used for video generation.</p>
-                            </div>
-                          </>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Avatar Stats */}
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="bg-indigo-50 rounded-lg p-3 text-center">
-                        <p className="text-lg font-semibold text-indigo-600">{availableAvatars.length}</p>
-                        <p className="text-xs text-indigo-600">Available Avatars</p>
-                      </div>
-                      <div className="bg-emerald-50 rounded-lg p-3 text-center">
-                        <p className="text-lg font-semibold text-emerald-600">
-                          {(customAvatarId && hasUploadedVideo) ? 'Ready' : 
-                           avatarCreation.isProcessing ? 'Processing' : 'Pending'}
-                        </p>
-                        <p className="text-xs text-emerald-600">Kevin's Avatar</p>
-                      </div>
-                    </div>
-
-                    {/* Action Buttons */}
-                    <div className="flex space-x-3">
-                      <Button 
-                        variant="outline" 
-                        className="flex-1"
-                        onClick={async () => {
-                          try {
-                            const avatars = await heygenAPI.getAvatars()
-                            setAvailableAvatars(avatars)
-                            
-                            // Check for new custom avatar
-                            const newCustomAvatar = avatars.find((a: any) => 
-                              a.avatar_name.toLowerCase().includes('instant') ||
-                              a.avatar_name.toLowerCase().includes('my') ||
-                              (uploadedVideo.file && a.avatar_name.includes(uploadedVideo.file.name.split('.')[0]))
-                            )
-                            
-                            if (newCustomAvatar && !customAvatarId) {
-                              setCustomAvatarId(newCustomAvatar.avatar_id)
-                              setSelectedAvatarId(newCustomAvatar.avatar_id)
-                              setAvatarCreation(prev => ({
-                                ...prev,
-                                isProcessing: false,
-                                progress: 100,
-                                phase: 'Avatar created successfully!'
-                              }))
-                            }
-                          } catch (error) {
-                            console.error('Error refreshing avatars:', error)
-                          }
-                        }}
-                        disabled={avatarCreation.isProcessing}
-                      >
-                        <RefreshCw className="w-4 h-4 mr-2" />
-                        Refresh Avatars
-                      </Button>
-                      <Button 
-                        variant="outline" 
-                        className="flex-1"
-                        onClick={() => {
-                          if (customAvatarId) {
-                            const avatar = availableAvatars.find(a => a.avatar_id === customAvatarId)
-                            if (avatar?.preview_video_url) {
-                              window.open(avatar.preview_video_url, '_blank')
-                            }
-                          } else if (uploadedVideo.url) {
-                            window.open(uploadedVideo.url, '_blank')
-                          } else if (selectedAvatarId) {
-                            const avatar = availableAvatars.find(a => a.avatar_id === selectedAvatarId)
-                            if (avatar?.preview_video_url) {
-                              window.open(avatar.preview_video_url, '_blank')
-                            }
-                          }
-                        }}
-                        disabled={!uploadedVideo.url && !customAvatarId && !selectedAvatarId}
-                      >
-                        <Eye className="w-4 h-4 mr-2" />
-                        Preview Avatar
-                      </Button>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
+                {/* Add more settings content here as needed */}
+              </div>
+            </div>
           )}
         </div>
-      </div>
 
-      {/* Floating Avatar Creation Status */}
-      {avatarCreation.isProcessing && activeTab !== 'settings' && (
-        <div className="fixed bottom-4 right-4 z-50 animate-in slide-in-from-bottom-2 duration-300">
-          <div className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white px-4 py-3 rounded-lg shadow-lg max-w-sm">
-            <div className="flex items-center space-x-3">
-              <div className="w-8 h-8 bg-blue-400 rounded-full flex items-center justify-center flex-shrink-0">
-                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="font-semibold text-sm">Creating Kevin's Avatar (Demo)</p>
-                <p className="text-xs opacity-90 truncate">{avatarCreation.phase}</p>
-                <div className="w-full bg-blue-400 rounded-full h-1 mt-2">
-                  <div 
-                    className="h-1 bg-white rounded-full transition-all duration-500" 
-                    style={{ width: `${avatarCreation.progress}%` }}
-                  ></div>
-                </div>
-              </div>
-              <button
-                onClick={() => setActiveTab('settings')}
-                className="text-white/80 hover:text-white transition-colors"
-              >
-                <Eye className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {showToast && (
-        <div className="fixed top-4 right-4 z-[100] animate-in slide-in-from-top-2 duration-300">
-          <div
-            className={`${toastMessage.title.toLowerCase().includes("error") ? "bg-red-600" : "bg-emerald-600"} text-white px-6 py-4 rounded-lg shadow-lg flex items-center space-x-3`}
-          >
+        {/* Toast Notifications */}
+        {showToast && (
+          <div className="fixed top-4 right-4 z-[100] animate-in slide-in-from-top-2 duration-300">
             <div
-              className={`w-6 h-6 ${toastMessage.title.toLowerCase().includes("error") ? "bg-red-500" : "bg-emerald-500"} rounded-full flex items-center justify-center`}
+              className={`${toastMessage.title.toLowerCase().includes("error") ? "bg-red-600" : "bg-emerald-600"} text-white px-6 py-4 rounded-lg shadow-lg flex items-center space-x-3`}
             >
-              {toastMessage.title.toLowerCase().includes("error") ? (
-                <X className="w-4 h-4 text-white" />
-              ) : (
-                <Check className="w-4 h-4 text-white" />
-              )}
-            </div>
-            <div>
-              <p className="font-semibold">{toastMessage.title}</p>
-              <p
-                className={`text-sm ${toastMessage.title.toLowerCase().includes("error") ? "text-red-100" : "text-emerald-100"}`}
+              <div
+                className={`w-6 h-6 ${toastMessage.title.toLowerCase().includes("error") ? "bg-red-500" : "bg-emerald-500"} rounded-full flex items-center justify-center`}
               >
-                {toastMessage.description}
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Script Generation Loading Overlay */}
-      {isGeneratingScripts && currentStep === "analysis" && (
-        <div className="fixed inset-0 bg-black/10 backdrop-blur-sm z-40 flex items-center justify-center">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 p-8">
-            <div className="text-center">
-              <div className="w-16 h-16 bg-gradient-to-br from-emerald-500 to-teal-500 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg">
-                <div className="relative">
-                  <Sparkles className="w-8 h-8 text-white animate-pulse" />
-                  <div className="absolute inset-0 rounded-full border-2 border-white/50 animate-spin"></div>
-                </div>
-              </div>
-              <h3 className="text-2xl font-bold text-slate-900 mb-2">
-                {personalData ? 'Creating Personalized Scripts' : 'Generating Your Scripts'}
-              </h3>
-              <p className="text-slate-600 mb-6">
-                {personalData 
-                  ? 'Analyzing your social media data to create personalized A-roll and B-roll scripts...'
-                  : 'Creating engaging A-roll and B-roll scripts based on market analysis...'
-                }
-              </p>
-              
-              {/* Enhanced progress bar */}
-              <div className="mb-6">
-                <div className="w-full bg-slate-200 rounded-full h-3 overflow-hidden mb-2">
-                  <div className="h-full bg-gradient-to-r from-emerald-500 to-teal-500 rounded-full transition-all duration-1000 ease-out animate-pulse" style={{ width: '75%' }}></div>
-                </div>
-                <p className="text-sm text-slate-500">Processing your content...</p>
-              </div>
-              
-              <div className="bg-slate-50 rounded-xl p-4">
-                <div className="flex items-center justify-center space-x-3">
-                  <Loader2 className="w-5 h-5 animate-spin text-emerald-500" />
-                  <span className="text-slate-700 font-medium">
-                    {personalData ? 'LangChain AI Personalizing...' : 'AI Script Generation...'}
-                  </span>
-                </div>
-                {personalData && (
-                  <div className="mt-3 flex items-center justify-center space-x-4 text-xs text-slate-500">
-                    {personalData.urls?.youtube && (
-                      <div className="flex items-center space-x-1">
-                        <Video className="w-3 h-3" />
-                        <span>YouTube</span>
-                      </div>
-                    )}
-                    {personalData.urls?.linkedin && (
-                      <div className="flex items-center space-x-1">
-                        <Users className="w-3 h-3" />
-                        <span>LinkedIn</span>
-                      </div>
-                    )}
-                  </div>
+                {toastMessage.title.toLowerCase().includes("error") ? (
+                  <X className="w-4 h-4 text-white" />
+                ) : (
+                  <Check className="w-4 h-4 text-white" />
                 )}
               </div>
+              <div>
+                <p className="font-semibold">{toastMessage.title}</p>
+                <p
+                  className={`text-sm ${toastMessage.title.toLowerCase().includes("error") ? "text-red-100" : "text-emerald-100"}`}
+                >
+                  {toastMessage.description}
+                </p>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Video Generation Loading Modal */}
-      {showGenerationModal && (
-        <div className="fixed inset-0 bg-black/20 backdrop-blur-sm z-50 flex items-center justify-center">
-          <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full mx-4 p-8">
-            <div className="text-center">
-              {/* Header */}
-              <div className="w-20 h-20 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-lg">
-                <Video className="w-10 h-10 text-white" />
-              </div>
-              
-              <h3 className="text-2xl font-bold text-slate-900 mb-2">
-                Generating Your Video
-              </h3>
-              <p className="text-slate-600 mb-8">
-                Creating your AI-powered video with captions
-              </p>
-              
-              {/* Loading Stages */}
-              <div className="space-y-4 mb-8">
-                {generationStages.map((stage, index) => (
-                  <div key={index} className="flex items-center space-x-4">
-                    {/* Stage Icon */}
-                    <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center transition-all duration-500 ${
-                      stage.completed 
-                        ? 'bg-emerald-500 text-white' 
-                        : stage.active 
-                          ? 'bg-indigo-500 text-white animate-pulse' 
-                          : 'bg-slate-200 text-slate-400'
-                    }`}>
-                      {stage.completed ? (
-                        <Check className="w-4 h-4" />
-                      ) : stage.active ? (
-                        <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      ) : (
-                        <div className="w-2 h-2 rounded-full bg-current" />
-                      )}
-                    </div>
-                    
-                    {/* Stage Text */}
-                    <div className="flex-1 text-left">
-                      <p className={`text-sm font-medium transition-all duration-300 ${
-                        stage.completed 
-                          ? 'text-emerald-600' 
-                          : stage.active 
-                            ? 'text-indigo-600' 
-                            : 'text-slate-400'
-                      }`}>
-                        {stage.name}
-                      </p>
-                    </div>
-                    
-                    {/* Status Indicator */}
-                    <div className="flex-shrink-0">
-                      {stage.completed && (
-                        <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
-                      )}
-                      {stage.active && (
-                        <div className="flex space-x-1">
-                          <div className="w-1 h-1 bg-indigo-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                          <div className="w-1 h-1 bg-indigo-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                          <div className="w-1 h-1 bg-indigo-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-              
-              {/* Progress Bar */}
-              <div className="mb-6">
-                <div className="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
-                  <div 
-                    className="h-full bg-gradient-to-r from-indigo-500 to-purple-600 rounded-full transition-all duration-1000 ease-out" 
-                    style={{ width: `${(generationStages.filter(s => s.completed).length / generationStages.length) * 100}%` }}
-                  />
+        {/* Video Generation Modal */}
+        {showGenerationModal && (
+          <div className="fixed inset-0 bg-black/20 backdrop-blur-sm z-50 flex items-center justify-center">
+            <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full mx-4 p-8">
+              <div className="text-center">
+                <div className="w-20 h-20 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-lg">
+                  <Video className="w-10 h-10 text-white" />
                 </div>
-                <p className="text-xs text-slate-500 mt-2">
-                  {generationStages.filter(s => s.completed).length} of {generationStages.length} stages complete
+                
+                <h3 className="text-2xl font-bold text-slate-900 mb-2">
+                  Generating Your Video
+                </h3>
+                <p className="text-slate-600 mb-8">
+                  Creating your AI-powered video with captions
                 </p>
-              </div>
-              
-              {/* Footer Message */}
-              <div className="bg-indigo-50 rounded-xl p-4">
-                <p className="text-sm text-indigo-700">
-                  This may take a few moments. Please don't close this window.
-                </p>
+                
+                {/* Loading Stages */}
+                <div className="space-y-4 mb-8">
+                  {generationStages.map((stage, index) => (
+                    <div key={index} className="flex items-center space-x-4">
+                      <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center transition-all duration-500 ${
+                        stage.completed 
+                          ? 'bg-emerald-500 text-white' 
+                          : stage.active 
+                            ? 'bg-indigo-500 text-white animate-pulse' 
+                            : 'bg-slate-200 text-slate-400'
+                      }`}>
+                        {stage.completed ? (
+                          <Check className="w-4 h-4" />
+                        ) : stage.active ? (
+                          <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        ) : (
+                          <div className="w-2 h-2 rounded-full bg-current" />
+                        )}
+                      </div>
+                      
+                      <div className="flex-1 text-left">
+                        <p className={`text-sm font-medium transition-all duration-300 ${
+                          stage.completed 
+                            ? 'text-emerald-600' 
+                            : stage.active 
+                              ? 'text-indigo-600' 
+                              : 'text-slate-400'
+                        }`}>
+                          {stage.name}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                
+                <div className="bg-indigo-50 rounded-xl p-4">
+                  <p className="text-sm text-indigo-700">
+                    This may take a few moments. Please don't close this window.
+                  </p>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   )
 }

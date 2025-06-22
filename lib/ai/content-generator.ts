@@ -194,24 +194,37 @@ Generate two scripts:
 - ${profileData ? 'Match the creator\'s established tone and style' : 'Professional but conversational tone'}
 - Include trending keywords naturally
 - Strong call-to-action
-- 20-30 seconds of content
+- 25-35 seconds of content
 - IMPORTANT: Write only the spoken dialogue - NO presenter labels, timestamps, or asterisk formatting
 
-2. B-ROLL SCRIPT (Visual directions with timestamps):
-Format: [MM:SS-MM:SS] Visual description
-- Specific visual cues synchronized with speech
-- Text overlays and graphics
-- Transitions and effects
-- Platform-optimized elements
+2. B-ROLL SCRIPT (Detailed visual directions with multiple elements):
+Create 10-15 specific time segments (2-3 seconds each) with this format:
+[MM:SS-MM:SS] Primary visual description | Secondary visual/effect | Text overlay/graphic
+
+Requirements for B-roll segments:
+- Each segment should have 2-3 distinct visual elements
+- Primary visual: main B-roll footage/image needed
+- Secondary visual: additional overlays, effects, or graphics
+- Text overlay: specific text, statistics, or call-to-action
+- Focus on dynamic, attention-grabbing visuals
+- Include trending visual elements and transitions
+- Optimize for vertical video format (9:16)
+- Create visual hooks every 3-4 seconds
+- Include comparison shots, close-ups, and wide shots
+- Add animated graphics and text overlays throughout
+
+Example format:
+[00:00-00:03] Close-up product demonstration | Trending zoom transition | "Game Changer Alert!"
+[00:03-00:06] Split-screen before/after | Animated arrow pointing | "See The Difference"
+[00:06-00:09] User testimonial footage | Floating text bubble | "Real Results"
+[00:09-00:12] Behind-the-scenes content | Fast-forward effect | "How It's Made"
 
 ${profileData ? `
 3. PERSONALIZATION NOTES:
 Explain how the scripts were customized based on the creator's profile.
 ` : ''}
 
-Make it engaging and optimized for viral potential.
-
-CRITICAL: The A-roll script should contain ONLY the spoken words without any labels, timestamps, or formatting. The voice agent will speak this directly.`
+Make it engaging and optimized for maximum visual impact with multiple B-roll elements per segment.`
 
     const response = await openai.chat.completions.create({
       model: "gpt-4o",

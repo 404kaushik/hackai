@@ -120,12 +120,20 @@ A-roll script should be:
 - Write as if speaking directly to the audience
 
 B-roll script should be:
-- Specific visual directions
-- Shot descriptions and transitions
-- Text overlays and graphics
-- Timing cues
-- Visual hooks and attention-grabbers
-- Platform optimization notes
+- DETAILED visual directions with multiple segments
+- Create 8-12 specific time segments (each 2-4 seconds long)
+- Each segment should have 2-3 specific visual elements
+- Include text overlays, graphics, and transitions
+- Specify exact timing for maximum visual impact
+- Format: [MM:SS-MM:SS] Primary visual | Secondary visual | Text overlay
+- Focus on dynamic, attention-grabbing visuals
+- Include trending visual elements and effects
+- Platform optimization for vertical video (9:16)
+
+EXAMPLE B-roll format:
+[00:00-00:03] Close-up product shot | Trending transition effect | "The Secret Revealed"
+[00:03-00:06] Behind-the-scenes footage | Split-screen comparison | Statistics overlay
+[00:06-00:09] User testimonial clip | Animated graphics | Call-to-action text
 
 CRITICAL: The A-roll script must contain ONLY the spoken words without any labels, timestamps, or formatting. The voice agent will speak this content directly.`
 
