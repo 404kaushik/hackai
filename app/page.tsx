@@ -251,7 +251,7 @@ export default function LandingPage() {
               </div>
               <span className="text-xl font-bold">supernova</span>
             </div>
-            <p className="text-gray-500">© 2024 supernova. Built for creators, by creators.</p>
+            <p className="text-gray-500">© 2024 supernova. built for creators, by creators.</p>
           </div>
         </div>
       </footer>

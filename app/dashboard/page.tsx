@@ -2696,7 +2696,7 @@ export default function Dashboard() {
                         </span>
                         <div className="absolute -bottom-1 left-0 right-0 h-0.5 bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 rounded-full opacity-60"></div>
                       </span>{" "}
-                      in seconds
+                      in seconds.
                     </h1>
                     <p className="text-base lg:text-lg text-slate-600 mb-6 max-w-2xl mx-auto leading-relaxed font-light">
                       Transform any idea into engaging video content using HeyGen AI digital twin. From articles to
