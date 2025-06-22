@@ -38,6 +38,8 @@ import {
   AlertCircle,
   Loader2,
   Edit,
+  ChevronUp,
+  ArrowUp,
 } from "lucide-react"
 import { Progress } from "@/components/ui/progress"
 import { 
@@ -828,6 +830,18 @@ export default function Dashboard() {
     composedVideoUrl: ''
   })
 
+  // Video generation modal state
+  const [showGenerationModal, setShowGenerationModal] = useState(false)
+  const [generationStages, setGenerationStages] = useState([
+    { name: 'Initializing generation...', completed: false, active: false },
+    { name: 'Loading avatar...', completed: false, active: false },
+    { name: 'Processing script...', completed: false, active: false },
+    { name: 'Generating voice...', completed: false, active: false },
+    { name: 'Creating video...', completed: false, active: false },
+    { name: 'Adding captions...', completed: false, active: false },
+    { name: 'Finalizing...', completed: false, active: false }
+  ])
+
   // Load avatars and voices on component mount
   useEffect(() => {
     const loadHeyGenData = async () => {
@@ -1130,11 +1144,49 @@ export default function Dashboard() {
       return
     }
     
+    // Show the modal and reset stages
+    setShowGenerationModal(true)
+    setGenerationStages([
+      { name: 'Initializing generation...', completed: false, active: true },
+      { name: 'Loading avatar...', completed: false, active: false },
+      { name: 'Processing script...', completed: false, active: false },
+      { name: 'Generating voice...', completed: false, active: false },
+      { name: 'Creating video...', completed: false, active: false },
+      { name: 'Adding captions...', completed: false, active: false },
+      { name: 'Finalizing...', completed: false, active: false }
+    ])
+    
     setIsGenerating(true)
     setGenerationPhase('Starting video generation...')
     setGenerationProgress(10)
     
+    // Helper function to update stages
+    const updateStage = (stageIndex: number, completed: boolean = false, active: boolean = true) => {
+      setGenerationStages(prev => prev.map((stage, index) => ({
+        ...stage,
+        completed: index < stageIndex ? true : (index === stageIndex ? completed : false),
+        active: index === stageIndex ? active : false
+      })))
+    }
+    
     try {
+      // Stage 1: Initializing (already active)
+      await new Promise(resolve => setTimeout(resolve, 1500))
+      updateStage(0, true, false)
+      
+      // Stage 2: Loading avatar
+      updateStage(1, false, true)
+      await new Promise(resolve => setTimeout(resolve, 1000))
+      updateStage(1, true, false)
+      
+      // Stage 3: Processing script
+      updateStage(2, false, true)
+      await new Promise(resolve => setTimeout(resolve, 800))
+      updateStage(2, true, false)
+      
+      // Stage 4: Generating voice
+      updateStage(3, false, true)
+      
       // Step 1: Generate avatar video using HeyGen API
       const videoId = await heygenAPI.generateVideo(
         selectedAvatarId,
@@ -1144,6 +1196,10 @@ export default function Dashboard() {
       )
       
       setCurrentVideoId(videoId)
+      updateStage(3, true, false)
+      
+      // Stage 5: Creating video
+      updateStage(4, false, true)
       setGenerationPhase('HeyGen avatar video generation in progress...')
       setGenerationProgress(30)
       
@@ -1158,6 +1214,16 @@ export default function Dashboard() {
           console.log('Video URL (with captions):', status.video_url_caption)
           
           if (status.status === 'completed') {
+            updateStage(4, true, false)
+            
+            // Stage 6: Adding captions
+            updateStage(5, false, true)
+            await new Promise(resolve => setTimeout(resolve, 1500))
+            updateStage(5, true, false)
+            
+            // Stage 7: Finalizing
+            updateStage(6, false, true)
+            
             // Use the captioned video URL instead of the regular one
             const avatarVideoUrl = status.video_url_caption 
             
@@ -1174,13 +1240,17 @@ export default function Dashboard() {
             setGenerationProgress(100)
             setGenerationPhase('HeyGen video with captions ready!')
             
+            await new Promise(resolve => setTimeout(resolve, 1000))
+            updateStage(6, true, false)
+            
             setTimeout(() => {
+              setShowGenerationModal(false)
               setCurrentStep('video')
               setVisitedSteps(prev => new Set([...prev, 'video']))
               setIsGenerating(false)
               setGenerationPhase('')
               setGenerationProgress(0)
-            }, 2000)
+            }, 1500)
             
           } else if (status.status === 'processing' || status.status === 'pending') {
             console.log(`🔄 Video still processing... Status: ${status.status}`)
@@ -1195,6 +1265,7 @@ export default function Dashboard() {
           }
         } catch (error) {
           console.error('Error polling video status:', error)
+          setShowGenerationModal(false)
           setIsGenerating(false)
           setGenerationPhase('')
           alert(`Video generation failed: ${error instanceof Error ? error.message : 'Unknown error'}. Please try again.`)
@@ -1206,6 +1277,7 @@ export default function Dashboard() {
       
     } catch (error) {
       console.error('Error generating video:', error)
+      setShowGenerationModal(false)
       setIsGenerating(false)
       setGenerationPhase('')
       alert('Failed to start video generation. Please check your API key and try again.')
@@ -1815,7 +1887,15 @@ export default function Dashboard() {
     return (
       <div className="space-y-8">
         {/* Header */}
-        <div className="text-center mb-12">
+        <div className="text-center mb-12 relative">
+          <Button
+            variant="outline"
+            onClick={() => handleStepChange("input")}
+            className="absolute top-0 left-0 flex items-center bg-white text-slate-700 border-slate-300 hover:bg-slate-50"
+          >
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back
+          </Button>
           <div className="inline-flex items-center space-x-2 bg-gradient-to-r from-indigo-50 to-purple-50 px-4 py-2 rounded-full mb-4">
             <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
             <span className="text-sm font-medium text-slate-700">Live Market Data</span>
@@ -2277,15 +2357,7 @@ export default function Dashboard() {
         )}
 
         {/* Navigation */}
-        <div className="flex justify-between items-center pt-8">
-          <Button
-            variant="outline"
-            onClick={() => handleStepChange("input")}
-            className="flex items-center bg-white text-slate-700 border-slate-300 hover:bg-slate-50"
-          >
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to Input
-          </Button>
+        <div className="flex justify-center items-center pt-8">
           <div className="flex items-center space-x-4">
             <Button
               variant="outline"
@@ -2408,12 +2480,19 @@ export default function Dashboard() {
         </button>
 
         <div className="p-4 border-b border-slate-700">
-          <div className="flex items-center space-x-3">
+          <button
+            onClick={() => {
+              setActiveTab("create")
+              setCurrentStep("input")
+              setIsMobileMenuOpen(false)
+            }}
+            className="flex items-center space-x-3 hover:opacity-80 transition-opacity duration-200"
+          >
             <div className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center">
               <Sparkles className="w-5 h-5 text-white" />
             </div>
-            <span className="text-xl font-bold">Supernova</span>
-          </div>
+            <span className="text-xl font-bold">supernova</span>
+          </button>
         </div>
 
         <nav className="flex-1 p-3">
@@ -2421,27 +2500,27 @@ export default function Dashboard() {
             <li>
               <button
                 onClick={() => handleTabChange("create")}
-                className={`w-full flex items-center space-x-3 px-4 py-2 rounded-lg transition-colors ${
+                className={`w-full flex items-center space-x-2 px-3 py-1.5 rounded-lg transition-colors ${
                   activeTab === "create"
                     ? "bg-indigo-600 text-white"
                     : "text-slate-300 hover:bg-slate-700 hover:text-white"
                 }`}
               >
-                <Plus className="w-5 h-5" />
-                <span className="font-medium">Create</span>
+                <Plus className="w-4 h-4" />
+                <span className="text-sm">Create</span>
               </button>
             </li>
             <li>
               <button
                 onClick={() => handleTabChange("library")}
-                className={`w-full flex items-center space-x-3 px-4 py-2 rounded-lg transition-colors ${
+                className={`w-full flex items-center space-x-2 px-3 py-1.5 rounded-lg transition-colors ${
                   activeTab === "library"
                     ? "bg-indigo-600 text-white"
                     : "text-slate-300 hover:bg-slate-700 hover:text-white"
                 }`}
               >
-                <Folder className="w-5 h-5" />
-                <span className="font-medium">Library</span>
+                <Folder className="w-4 h-4" />
+                <span className="text-sm">Library</span>
               </button>
             </li>
           </ul>
@@ -2450,20 +2529,20 @@ export default function Dashboard() {
         <div className="p-3 border-t border-slate-700 space-y-1">
           <button
             onClick={() => handleTabChange("settings")}
-            className={`w-full flex items-center space-x-3 px-4 py-2 rounded-lg transition-colors ${
+            className={`w-full flex items-center space-x-2 px-3 py-1.5 rounded-lg transition-colors ${
               activeTab === "settings"
                 ? "bg-indigo-600 text-white"
                 : "text-slate-300 hover:bg-slate-700 hover:text-white"
             }`}
           >
-            <Settings className="w-5 h-5" />
-            <span className="font-medium">Settings</span>
+            <Settings className="w-4 h-4" />
+            <span className="text-sm">Settings</span>
           </button>
-          <div className="flex items-center space-x-3 px-4 py-2">
-            <div className="w-8 h-8 bg-slate-600 rounded-full flex items-center justify-center">
-              <User className="w-4 h-4" />
+          <div className="flex items-center space-x-2 px-3 py-1.5">
+            <div className="w-6 h-6 bg-slate-600 rounded-full flex items-center justify-center">
+              <User className="w-3 h-3" />
             </div>
-            <span className="text-sm text-slate-300">Alex Johnson</span>
+            <span className="text-xs text-slate-300">Kevin Valencia</span>
           </div>
         </div>
       </div>
@@ -2474,12 +2553,19 @@ export default function Dashboard() {
           <button onClick={() => setIsMobileMenuOpen(true)} className="p-2 hover:bg-gray-100 rounded-lg">
             <Menu className="w-6 h-6" />
           </button>
-          <div className="flex items-center space-x-2">
+          <button
+            onClick={() => {
+              setActiveTab("create")
+              setCurrentStep("input")
+              setIsMobileMenuOpen(false)
+            }}
+            className="flex items-center space-x-2 hover:opacity-80 transition-opacity duration-200"
+          >
             <div className="w-6 h-6 bg-gradient-to-br from-indigo-500 to-purple-600 rounded flex items-center justify-center">
               <Sparkles className="w-4 h-4 text-white" />
             </div>
-            <span className="font-bold">Supernova</span>
-          </div>
+            <span className="font-bold">supernova</span>
+          </button>
           <div className="w-10" />
         </div>
 
@@ -2575,99 +2661,100 @@ export default function Dashboard() {
 
               {currentStep === "input" && (
                 <>
-                  <div className="relative text-center mb-16 max-w-4xl mx-auto">
+                  <div className="relative text-center mb-20 mt-16 max-w-4xl mx-auto">
                     <div className="absolute inset-0 -z-10 overflow-hidden">
-                      <div className="absolute top-10 left-10 w-32 h-32 bg-indigo-100 rounded-full blur-3xl opacity-30"></div>
-                      <div className="absolute top-20 right-16 w-24 h-24 bg-purple-100 rounded-full blur-2xl opacity-40"></div>
-                      <div className="absolute bottom-10 left-1/3 w-28 h-28 bg-pink-100 rounded-full blur-3xl opacity-25"></div>
+                      <div className="absolute top-5 left-5 w-16 h-16 bg-indigo-100 rounded-full blur-2xl opacity-30"></div>
+                      <div className="absolute top-10 right-8 w-12 h-12 bg-purple-100 rounded-full blur-xl opacity-40"></div>
+                      <div className="absolute bottom-5 left-1/3 w-14 h-14 bg-pink-100 rounded-full blur-2xl opacity-25"></div>
                     </div>
-                    <div className="flex items-center justify-center mb-8 animate-fade-in">
-                      <div className="w-10 h-10 bg-gradient-to-br from-indigo-600 to-purple-600 rounded-xl flex items-center justify-center mr-3 shadow-lg">
-                        <Sparkles className="w-6 h-6 text-white" />
+                    <div className="flex items-center justify-center mb-4 animate-fade-in">
+                      <div className="w-8 h-8 bg-gradient-to-br from-indigo-600 to-purple-600 rounded-xl flex items-center justify-center mr-2 shadow-lg">
+                        <Sparkles className="w-4 h-4 text-white" />
                       </div>
-                      <span className="text-3xl font-bold bg-gradient-to-r from-slate-900 to-slate-700 bg-clip-text text-transparent">
+                      <span className="text-2xl font-bold bg-gradient-to-r from-slate-900 to-slate-700 bg-clip-text text-transparent">
                         supernova
                       </span>
                     </div>
-                    <h1 className="text-3xl lg:text-5xl font-bold text-slate-900 mb-8 leading-relaxed">
+                    <h1 className="text-2xl lg:text-3xl font-bold text-slate-900 mb-4 leading-tight">
                       Generate{" "}
                       <span className="relative inline-block">
                         <span className="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
                           viral content
                         </span>
-                        <div className="absolute -bottom-2 left-0 right-0 h-1 bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 rounded-full opacity-60"></div>
+                        <div className="absolute -bottom-1 left-0 right-0 h-0.5 bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 rounded-full opacity-60"></div>
                       </span>{" "}
                       in seconds
                     </h1>
-                    <p className="text-xl lg:text-2xl text-slate-600 mb-12 max-w-3xl mx-auto leading-relaxed font-light">
+                    <p className="text-base lg:text-lg text-slate-600 mb-6 max-w-2xl mx-auto leading-relaxed font-light">
                       Transform any idea into engaging video content using HeyGen AI digital twin. From articles to
                       trending topics - we've got you covered.
                     </p>
                   </div>
-                  <div className="max-w-3xl mx-auto mb-20 relative">
-                    <div className="absolute inset-0 bg-gradient-to-r from-indigo-500/10 via-purple-500/10 to-pink-500/10 rounded-3xl blur-xl"></div>
-                    <div className="relative bg-white/80 backdrop-blur-sm border border-white/20 rounded-3xl p-8 shadow-2xl">
+                  <div className="max-w-2xl mx-auto mb-16 relative">
+                    <div className="absolute inset-0 bg-gradient-to-r from-indigo-500/10 via-purple-500/10 to-pink-500/10 rounded-2xl blur-lg"></div>
+                    <div className="relative bg-white/80 backdrop-blur-sm border border-white/20 rounded-2xl p-4 shadow-xl">
                       <div className="relative">
                         <Input
                           value={contentInput}
                           onChange={(e) => setContentInput(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' && !e.shiftKey && contentInput.trim() && !isGenerating) {
+                              e.preventDefault()
+                              handleGenerate()
+                            }
+                          }}
                           placeholder="Describe your short video content idea..."
-                          className="h-14 px-8 pr-32 text-lg border-2 border-slate-200/50 focus:border-indigo-400 focus:ring-0 focus:outline-none rounded-2xl bg-white/90 backdrop-blur-sm shadow-lg placeholder:text-slate-400"
+                          className="h-16 px-6 pr-16 text-lg border-2 border-slate-200/50 focus:border-indigo-400 focus:ring-0 focus:outline-none rounded-xl bg-white/90 backdrop-blur-sm shadow-md placeholder:text-slate-400"
                           disabled={isGenerating}
                         />
                         <Button
                           onClick={handleGenerate}
                           disabled={!contentInput.trim() || isGenerating}
-                          className="absolute right-3 top-3 h-8 px-6 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
+                          className="absolute right-3 top-4 h-8 w-8 p-0 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
                         >
                           {isGeneratingAnalysis ? (
-                            <div className="flex items-center space-x-2">
-                              <Loader2 className="w-5 h-5 animate-spin" />
-                              <span>Analyzing...</span>
-                            </div>
+                            <Loader2 className="w-4 h-4 animate-spin" />
                           ) : (
-                            <>
-                              <Send className="w-5 h-5 mr-2" />
-                              Generate
-                            </>
+                            <ArrowUp className="w-4 h-4" />
                           )}
                         </Button>
                       </div>
                       
                       {/* Enhanced status indicators with personal data */}
-                      <div className="flex items-center justify-center mt-6 space-x-6">
-                        <div className="flex items-center space-x-2 text-slate-500">
-                          <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-                          <span className="text-sm font-medium">AI Ready</span>
+                      <div className="flex items-center justify-center mt-3 space-x-4">
+                        <div className="flex items-center space-x-1 text-slate-500">
+                          <div className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse"></div>
+                          <span className="text-xs font-medium">AI Ready</span>
                         </div>
-                        <div className="flex items-center space-x-2 text-slate-500">
-                          <Video className="w-4 h-4 text-indigo-500" />
-                          <span className="text-sm font-medium">HeyGen AI</span>
+                        <div className="flex items-center space-x-1 text-slate-500">
+                          <Video className="w-3 h-3 text-indigo-500" />
+                          <span className="text-xs font-medium">HeyGen AI</span>
                         </div>
-                        <div className="flex items-center space-x-2 text-slate-500">
-                          <Sparkles className="w-4 h-4 text-purple-500" />
-                          <span className="text-sm font-medium">Digital Twin</span>
+                        <div className="flex items-center space-x-1 text-slate-500">
+                          <Sparkles className="w-3 h-3 text-purple-500" />
+                          <span className="text-xs font-medium">Digital Twin</span>
                         </div>
                         {personalData && (
-                          <div className="flex items-center space-x-2 text-emerald-600">
-                            <User className="w-4 h-4" />
-                            <span className="text-sm font-medium">Personalized</span>
+                          <div className="flex items-center space-x-1 text-emerald-600">
+                            <User className="w-3 h-3" />
+                            <span className="text-xs font-medium">Personalized</span>
                       </div>
                         )}
                       </div>
 
                       {/* Add Socials Button */}
-                      <div className="flex justify-center mt-6">
+                      <div className="flex justify-center mt-3">
                         <Dialog open={showSocialsModal} onOpenChange={setShowSocialsModal}>
                           <DialogTrigger asChild>
                             <Button
                               variant="outline"
-                              className="bg-white/50 border-indigo-200 text-indigo-700 hover:bg-indigo-50 transition-all duration-300 hover:scale-105"
+                              size="sm"
+                              className="bg-white/50 border-indigo-200 text-indigo-700 hover:bg-indigo-50 transition-all duration-300 hover:scale-105 text-xs"
                             >
-                              <Users className="w-4 h-4 mr-2" />
+                              <Users className="w-3 h-3 mr-1" />
                               {personalData ? "Update Socials" : "Add Socials"}
                               {personalData && (
-                                <div className="w-2 h-2 bg-emerald-500 rounded-full ml-2"></div>
+                                <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full ml-1"></div>
                               )}
                             </Button>
                           </DialogTrigger>
@@ -2752,22 +2839,22 @@ export default function Dashboard() {
 
                       {/* Personal Data Preview */}
                       {personalData && (
-                        <div className="mt-6 p-4 bg-emerald-50 rounded-lg border border-emerald-200">
-                          <div className="flex items-center space-x-2 mb-3">
-                            <Check className="w-4 h-4 text-emerald-600" />
-                            <span className="text-sm font-medium text-emerald-900">Personal Data Loaded</span>
+                        <div className="mt-3 p-3 bg-emerald-50 rounded-lg border border-emerald-200">
+                          <div className="flex items-center space-x-2 mb-2">
+                            <Check className="w-3 h-3 text-emerald-600" />
+                            <span className="text-xs font-medium text-emerald-900">Personal Data Loaded</span>
                           </div>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
                             {personalData.youtube && (
                               <div className="bg-white/50 rounded p-2">
-                                <p className="font-medium text-slate-700">YouTube Insights</p>
-                                <p className="text-slate-600">{personalData.youtube.channelName || "Channel data analyzed"}</p>
+                                <p className="font-medium text-slate-700 text-xs">YouTube Insights</p>
+                                <p className="text-slate-600 text-xs">{personalData.youtube.channelName || "Channel data analyzed"}</p>
                               </div>
                             )}
                             {personalData.linkedin && (
                               <div className="bg-white/50 rounded p-2">
-                                <p className="font-medium text-slate-700">LinkedIn Profile</p>
-                                <p className="text-slate-600">{personalData.linkedin.name || "Professional data analyzed"}</p>
+                                <p className="font-medium text-slate-700 text-xs">LinkedIn Profile</p>
+                                <p className="text-slate-600 text-xs">{personalData.linkedin.name || "Professional data analyzed"}</p>
                               </div>
                             )}
                           </div>
@@ -2775,31 +2862,31 @@ export default function Dashboard() {
                       )}
                     </div>
                   </div>
-                  <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
-                    <div className="text-center p-6 rounded-2xl bg-gradient-to-br from-indigo-50 to-purple-50 border border-indigo-100 hover:shadow-lg transition-all duration-300 hover:-translate-y-1">
-                      <div className="w-16 h-16 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
-                        <User className="w-8 h-8 text-white" />
+                  <div className="grid md:grid-cols-3 gap-4 max-w-4xl mx-auto">
+                    <div className="text-center p-4 rounded-xl bg-gradient-to-br from-indigo-50 to-purple-50 border border-indigo-100 hover:shadow-md transition-all duration-300 hover:-translate-y-1">
+                      <div className="w-12 h-12 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center mx-auto mb-3 shadow-lg">
+                        <User className="w-6 h-6 text-white" />
                       </div>
-                      <h3 className="text-xl font-bold text-slate-900 mb-2">HeyGen AI Avatar</h3>
-                      <p className="text-slate-600 leading-relaxed">
+                      <h3 className="text-lg font-bold text-slate-900 mb-2">HeyGen AI Avatar</h3>
+                      <p className="text-xs text-slate-600 leading-relaxed">
                         Create your personalized AI avatar with HeyGen's advanced technology
                       </p>
                     </div>
-                    <div className="text-center p-6 rounded-2xl bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-100 hover:shadow-lg transition-all duration-300 hover:-translate-y-1">
-                      <div className="w-16 h-16 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
-                        <TrendingUp className="w-8 h-8 text-white" />
+                    <div className="text-center p-4 rounded-xl bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-100 hover:shadow-md transition-all duration-300 hover:-translate-y-1">
+                      <div className="w-12 h-12 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl flex items-center justify-center mx-auto mb-3 shadow-lg">
+                        <TrendingUp className="w-6 h-6 text-white" />
                       </div>
-                      <h3 className="text-xl font-bold text-slate-900 mb-2">Dynamic Analysis</h3>
-                      <p className="text-slate-600 leading-relaxed">
+                      <h3 className="text-lg font-bold text-slate-900 mb-2">Dynamic Analysis</h3>
+                      <p className="text-xs text-slate-600 leading-relaxed">
                         AI-powered content optimization based on real market data
                       </p>
                     </div>
-                    <div className="text-center p-6 rounded-2xl bg-gradient-to-br from-pink-50 to-rose-50 border border-pink-100 hover:shadow-lg transition-all duration-300 hover:-translate-y-1">
-                      <div className="w-16 h-16 bg-gradient-to-br from-pink-500 to-rose-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
-                        <Video className="w-8 h-8 text-white" />
+                    <div className="text-center p-4 rounded-xl bg-gradient-to-br from-pink-50 to-rose-50 border border-pink-100 hover:shadow-md transition-all duration-300 hover:-translate-y-1">
+                      <div className="w-12 h-12 bg-gradient-to-br from-pink-500 to-rose-600 rounded-xl flex items-center justify-center mx-auto mb-3 shadow-lg">
+                        <Video className="w-6 h-6 text-white" />
                       </div>
-                      <h3 className="text-xl font-bold text-slate-900 mb-2">Instant Videos</h3>
-                      <p className="text-slate-600 leading-relaxed">
+                      <h3 className="text-lg font-bold text-slate-900 mb-2">Instant Videos</h3>
+                      <p className="text-xs text-slate-600 leading-relaxed">
                         Generate professional videos instantly with HeyGen AI technology
                       </p>
                     </div>
@@ -2811,7 +2898,15 @@ export default function Dashboard() {
 
               {currentStep === "storyboard" && (
                 <div className="space-y-8">
-                  <div className="text-center mb-8 relative">
+                  <div className="text-center mb-12 relative">
+                    <Button
+                      variant="outline"
+                      onClick={() => handleStepChange("input")}
+                      className="absolute top-0 left-0 flex items-center bg-white text-slate-700 border-slate-300 hover:bg-slate-50"
+                    >
+                      <ArrowLeft className="w-4 h-4 mr-2" />
+                      Back
+                    </Button>
                     <div className="flex items-center justify-center mb-4">
                       {personalData && (
                         <div className="inline-flex items-center space-x-2 bg-gradient-to-r from-emerald-50 to-green-50 px-4 py-2 rounded-full border border-emerald-200 mr-4">
@@ -2853,14 +2948,6 @@ export default function Dashboard() {
                         </div>
                       </div>
                     )}
-                    <Button
-                      variant="outline"
-                      onClick={() => handleStepChange("analysis")}
-                      className="absolute top-0 left-0 flex items-center bg-white text-slate-700 border-slate-300 hover:bg-slate-50"
-                    >
-                      <ArrowLeft className="w-4 h-4 mr-2" />
-                      Back
-                    </Button>
                   </div>
 
                   {apiError && (
@@ -3547,7 +3634,7 @@ export default function Dashboard() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
                         <Label htmlFor="name">Name</Label>
-                        <Input id="name" defaultValue="Alex Johnson" />
+                        <Input id="name" defaultValue="Kevin Valencia" />
                     </div>
                       <div>
                         <Label htmlFor="email">Email</Label>
@@ -4123,6 +4210,98 @@ export default function Dashboard() {
                     )}
                   </div>
                 )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Video Generation Loading Modal */}
+      {showGenerationModal && (
+        <div className="fixed inset-0 bg-black/20 backdrop-blur-sm z-50 flex items-center justify-center">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full mx-4 p-8">
+            <div className="text-center">
+              {/* Header */}
+              <div className="w-20 h-20 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-lg">
+                <Video className="w-10 h-10 text-white" />
+              </div>
+              
+              <h3 className="text-2xl font-bold text-slate-900 mb-2">
+                Generating Your Video
+              </h3>
+              <p className="text-slate-600 mb-8">
+                Creating your AI-powered video with captions
+              </p>
+              
+              {/* Loading Stages */}
+              <div className="space-y-4 mb-8">
+                {generationStages.map((stage, index) => (
+                  <div key={index} className="flex items-center space-x-4">
+                    {/* Stage Icon */}
+                    <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center transition-all duration-500 ${
+                      stage.completed 
+                        ? 'bg-emerald-500 text-white' 
+                        : stage.active 
+                          ? 'bg-indigo-500 text-white animate-pulse' 
+                          : 'bg-slate-200 text-slate-400'
+                    }`}>
+                      {stage.completed ? (
+                        <Check className="w-4 h-4" />
+                      ) : stage.active ? (
+                        <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      ) : (
+                        <div className="w-2 h-2 rounded-full bg-current" />
+                      )}
+                    </div>
+                    
+                    {/* Stage Text */}
+                    <div className="flex-1 text-left">
+                      <p className={`text-sm font-medium transition-all duration-300 ${
+                        stage.completed 
+                          ? 'text-emerald-600' 
+                          : stage.active 
+                            ? 'text-indigo-600' 
+                            : 'text-slate-400'
+                      }`}>
+                        {stage.name}
+                      </p>
+                    </div>
+                    
+                    {/* Status Indicator */}
+                    <div className="flex-shrink-0">
+                      {stage.completed && (
+                        <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
+                      )}
+                      {stage.active && (
+                        <div className="flex space-x-1">
+                          <div className="w-1 h-1 bg-indigo-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                          <div className="w-1 h-1 bg-indigo-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                          <div className="w-1 h-1 bg-indigo-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              
+              {/* Progress Bar */}
+              <div className="mb-6">
+                <div className="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
+                  <div 
+                    className="h-full bg-gradient-to-r from-indigo-500 to-purple-600 rounded-full transition-all duration-1000 ease-out" 
+                    style={{ width: `${(generationStages.filter(s => s.completed).length / generationStages.length) * 100}%` }}
+                  />
+                </div>
+                <p className="text-xs text-slate-500 mt-2">
+                  {generationStages.filter(s => s.completed).length} of {generationStages.length} stages complete
+                </p>
+              </div>
+              
+              {/* Footer Message */}
+              <div className="bg-indigo-50 rounded-xl p-4">
+                <p className="text-sm text-indigo-700">
+                  This may take a few moments. Please don't close this window.
+                </p>
               </div>
             </div>
           </div>

@@ -194,7 +194,7 @@ Generate two scripts:
 - ${profileData ? 'Match the creator\'s established tone and style' : 'Professional but conversational tone'}
 - Include trending keywords naturally
 - Strong call-to-action
-- 60-90 seconds of content
+- 20-30 seconds of content
 
 2. **B-ROLL SCRIPT** (Visual directions with timestamps):
 Format: [MM:SS-MM:SS] Visual description

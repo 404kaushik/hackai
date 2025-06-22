@@ -114,7 +114,7 @@ A-roll script should be:
 - Hook within first 3 seconds  
 - Clear value proposition
 - Natural, conversational tone
-- 30-90 seconds when spoken
+- 20-30 seconds when spoken
 - Include natural pauses and emphasis
 
 B-roll script should be:
