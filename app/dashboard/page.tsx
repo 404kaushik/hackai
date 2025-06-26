@@ -81,9 +81,29 @@ const PEXELS_BASE_URL = 'https://api.pexels.com/videos'
 // Helper function to get the API key
 const getApiKey = () => {
   // Use the API token directly as provided by HeyGen
-  return process.env.HEYGEN_API_KEY
+  // For client-side access, the environment variable must be prefixed with NEXT_PUBLIC_
+  return process.env.NEXT_PUBLIC_HEYGEN_API_KEY
 }
 
+// Demo data for when API is not available
+const DEMO_AVATARS = [
+  {
+    avatar_id: 'demo_avatar_1',
+    avatar_name: 'Demo Avatar - Kevin',
+    gender: 'male',
+    preview_image_url: '/placeholder-avatar.jpg',
+    preview_video_url: '/HackAI Demo.mp4'
+  }
+]
+
+const DEMO_VOICES = [
+  {
+    voice_id: 'demo_voice_1',
+    name: 'Kevin Demo Voice',
+    language: 'English',
+    gender: 'male'
+  }
+]
 
 // HeyGen API Functions
 const heygenAPI = {
@@ -885,14 +905,39 @@ export default function Dashboard() {
       
       try {
         // First test the API key
-        const isValidKey = await heygenAPI.testApiKey()
-        if (!isValidKey) {
+        const apiKey = getApiKey()
+        console.log('Checking API key availability:', !!apiKey)
+        
+        if (!apiKey) {
+          console.log('No API key found, using demo mode')
+          // Use demo data when no API key is provided
+          setAvailableAvatars(DEMO_AVATARS)
+          setAvailableVoices(DEMO_VOICES)
+          setSelectedAvatarId(DEMO_AVATARS[0].avatar_id)
+          setSelectedVoiceId(DEMO_VOICES[0].voice_id)
+          
           setApiStatus({
             connected: false,
             testing: false,
-            error: 'Invalid API key'
+            error: 'Demo mode - Add NEXT_PUBLIC_HEYGEN_API_KEY to enable HeyGen API'
           })
-          console.error('Invalid HeyGen API key')
+          return
+        }
+        
+        const isValidKey = await heygenAPI.testApiKey()
+        if (!isValidKey) {
+          console.log('Invalid API key, using demo mode')
+          // Use demo data when API key is invalid
+          setAvailableAvatars(DEMO_AVATARS)
+          setAvailableVoices(DEMO_VOICES)
+          setSelectedAvatarId(DEMO_AVATARS[0].avatar_id)
+          setSelectedVoiceId(DEMO_VOICES[0].voice_id)
+          
+          setApiStatus({
+            connected: false,
+            testing: false,
+            error: 'Invalid API key - Using demo mode'
+          })
           return
         }
 
@@ -901,15 +946,19 @@ export default function Dashboard() {
           heygenAPI.getVoices()
         ])
         
-        setAvailableAvatars(avatars)
-        setAvailableVoices(voices)
+        // Fallback to demo data if API returns empty arrays
+        const finalAvatars = avatars.length > 0 ? avatars : DEMO_AVATARS
+        const finalVoices = voices.length > 0 ? voices : DEMO_VOICES
+        
+        setAvailableAvatars(finalAvatars)
+        setAvailableVoices(finalVoices)
         
         // Auto-select Kevin's custom avatar and voice if available, otherwise fallback to instant avatars
-        const kevinAvatar = avatars.find((a: any) => 
+        const kevinAvatar = finalAvatars.find((a: any) => 
           a.avatar_name?.toLowerCase().includes('kevin') || 
           (a.avatar_name?.toLowerCase().includes('instant') && customAvatarId && a.avatar_id === customAvatarId)
         )
-        const instantAvatar = avatars.find((a: any) => a.avatar_name?.includes('Instant') || a.avatar_name?.includes('My'))
+        const instantAvatar = finalAvatars.find((a: any) => a.avatar_name?.includes('Instant') || a.avatar_name?.includes('My'))
         
         if (kevinAvatar) {
           setSelectedAvatarId(kevinAvatar.avatar_id)
@@ -923,33 +972,40 @@ export default function Dashboard() {
           if (hasUploadedVideo) {
             setCustomAvatarId(instantAvatar.avatar_id)
           }
-        } else if (avatars.length > 0) {
-          setSelectedAvatarId(avatars[0].avatar_id)
+        } else if (finalAvatars.length > 0) {
+          setSelectedAvatarId(finalAvatars[0].avatar_id)
         }
         
-        if (voices.length > 0) {
+        if (finalVoices.length > 0) {
           // Prefer Kevin's voice, then English voices
-          const kevinVoice = voices.find((v: any) => v.name?.toLowerCase().includes('kevin'))
-          const englishVoice = voices.find((v: any) => v.language === 'English')
-          setSelectedVoiceId(kevinVoice?.voice_id || englishVoice?.voice_id || voices[0].voice_id)
+          const kevinVoice = finalVoices.find((v: any) => v.name?.toLowerCase().includes('kevin'))
+          const englishVoice = finalVoices.find((v: any) => v.language === 'English')
+          setSelectedVoiceId(kevinVoice?.voice_id || englishVoice?.voice_id || finalVoices[0].voice_id)
         }
 
         setApiStatus({
-          connected: true,
+          connected: avatars.length > 0 && voices.length > 0,
           testing: false,
-          error: null
+          error: avatars.length === 0 || voices.length === 0 ? 'Limited API access - Using demo fallbacks' : null
         })
       } catch (error) {
         console.error('Error loading HeyGen data:', error)
-        let errorMessage = 'Connection failed'
+        
+        // Fallback to demo data on any error
+        setAvailableAvatars(DEMO_AVATARS)
+        setAvailableVoices(DEMO_VOICES)
+        setSelectedAvatarId(DEMO_AVATARS[0].avatar_id)
+        setSelectedVoiceId(DEMO_VOICES[0].voice_id)
+        
+        let errorMessage = 'Connection failed - Using demo mode'
         
         if (error instanceof Error) {
           if (error.message.includes('Unauthorized')) {
-            errorMessage = 'Invalid API key'
+            errorMessage = 'Invalid API key - Using demo mode'
           } else if (error.message.includes('network') || error.message.includes('fetch')) {
-            errorMessage = 'Network error'
+            errorMessage = 'Network error - Using demo mode'
           } else {
-            errorMessage = error.message
+            errorMessage = `${error.message} - Using demo mode`
           }
         }
         
@@ -1033,7 +1089,7 @@ export default function Dashboard() {
       // Initialize B-roll demo if we have footage
       if (brollFootage.length === 0 && bRollScript.includes('B-ROLL')) {
         console.log('🎬 Initializing B-roll demo for video preview...')
-        loadBrollFootage(bRollScript)
+        // loadBrollFootage(bRollScript)
       }
     }
   }, [currentStep, brollFootage.length, bRollScript]);
@@ -1154,7 +1210,7 @@ export default function Dashboard() {
 
   // Load B-roll footage based on script
   const loadBrollFootage = async (brollScript: string) => {
-    setLoadingBroll(true)
+    /* setLoadingBroll(true)
     try {
       const footage = await pexelsAPI.getBrollFootage(brollScript)
       setBrollFootage(footage)
@@ -1163,13 +1219,31 @@ export default function Dashboard() {
       console.error('Error loading B-roll footage:', error)
     } finally {
       setLoadingBroll(false)
-    }
+    } */
   }
 
 
   const handleGenerateVideo = async () => {
-    if (!aRollScript || !selectedAvatarId || !selectedVoiceId) {
-      alert('Please ensure you have a script and selected avatar/voice')
+    if (!aRollScript) {
+      alert('Please ensure you have a script generated')
+      return
+    }
+
+    // Auto-select avatar and voice if not already selected
+    if (!selectedAvatarId && availableAvatars.length > 0) {
+      setSelectedAvatarId(availableAvatars[0].avatar_id)
+    }
+    
+    if (!selectedVoiceId && availableVoices.length > 0) {
+      setSelectedVoiceId(availableVoices[0].voice_id)
+    }
+
+    // Use the current or auto-selected values
+    const avatarToUse = selectedAvatarId || (availableAvatars.length > 0 ? availableAvatars[0].avatar_id : '')
+    const voiceToUse = selectedVoiceId || (availableVoices.length > 0 ? availableVoices[0].voice_id : '')
+
+    if (!avatarToUse || !voiceToUse) {
+      alert('No avatars or voices available. Please check your API connection.')
       return
     }
     
@@ -1216,12 +1290,12 @@ export default function Dashboard() {
       // Stage 4: Generating voice
       updateStage(3, false, true)
       
-      // Step 1: Generate avatar video using HeyGen API
+      // Step 1: Generate avatar video using HeyGen API (without B-roll footage)
       const videoId = await heygenAPI.generateVideo(
-        selectedAvatarId,
-        selectedVoiceId,
+        avatarToUse,
+        voiceToUse,
         aRollScript,
-        brollFootage
+        [] // Remove B-roll footage parameter
       )
       
       setCurrentVideoId(videoId)
@@ -3351,20 +3425,20 @@ export default function Dashboard() {
                       </div>
 
                       {/* Composition Settings */}
-                      <CompositionSettings
+                      {/* <CompositionSettings
                         settings={compositionSettings}
                         onSettingsChange={setCompositionSettings}
                         className="mb-6"
-                      />
+                      /> */}
 
-                      <MediaSelector
+                      {/* <MediaSelector
                         segments={parseBrollSegments(bRollScript)}
                         onMediaSelect={handleMediaSelect}
                         onMediaRemove={handleMediaRemove}
-                      />
+                      /> */}
 
                       {/* Composition Preview */}
-                      {compositionSegments.length > 0 && (
+                      {/* {compositionSegments.length > 0 && (
                         <CompositionPreview
                           segments={compositionSegments}
                           totalDuration={Math.max(...compositionSegments.map(s => s.endTime))}
@@ -3374,7 +3448,7 @@ export default function Dashboard() {
                           processingStage={compositionStage}
                           onStartComposition={handleStartComposition}
                         />
-                      )}
+                      )} */}
                     </div>
                   )}
 
@@ -3396,7 +3470,7 @@ export default function Dashboard() {
 
                       <Button
                         onClick={handleGenerateVideo}
-                        disabled={isGenerating || !aRollScript || !bRollScript}
+                        disabled={isGenerating || !aRollScript}
                         className="px-8 py-4 text-lg bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
                       >
                         {isGenerating ? (
